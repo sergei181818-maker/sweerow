@@ -35,7 +35,7 @@ pad = lp(pad, 0.035) * 0.05
 # tremolo-ish slow swell
 pad *= 0.75 + 0.25 * np.sin(2 * np.pi * 0.11 * t)
 # intensity by scene
-inten = np.array([{'hook': .9, 'island': .8, 'order': .9, 'end45': .8, 'leaflets': .85, 'years': 1.1, 'alone': .7, 'twist': .35, 'suzuki': .8, 'command': .9, 'final': 1.25, 'cta': 1.0}[scene_at(x)] for x in np.arange(0, N) [::441] / SR])
+inten = np.array([{'hook': .9, 'island': .8, 'order': .9, 'end45': .8, 'leaflets': .85, 'years': 1.1, 'alone': .7, 'twist': .35, 'suzuki': .8, 'command': .9, 'final': 1.25, 'cta': 1.0, 'class': .6, 'panic': 1.15, 'mom': 1.0, 'dad': 1.05, 'evac': 1.1, 'wave': 1.3, 'zero': .45, 'angel': 1.0}.get(scene_at(x), .85) for x in np.arange(0, N) [::441] / SR])
 inten = np.repeat(inten, 441)[:N]; inten = lp(inten, 0.0005)
 pad *= inten
 # sub drone
