@@ -26,3 +26,11 @@
     https://claude.ai/artifact/FTh57eEVzsUTc4QXabdXPg: сжать до 720×1280 (`-crf 27 -maxrate 1.8M`, AAC 128k 44.1k, < 15 МБ),
     Artifact read этого url → добавить `<article>` с `<video controls playsinline>` сверху → publish с `url` и `files`.
     В чат отправлять ссылку на страницу, а mp4 — дополнительно.
+
+## Правила хоррора (с 2026-11-08, эталон video/golosovoe2)
+- Первая секунда — самый жуткий кадр (тизер-скример, сцена `teaser` с `"pause"` в script.json), потом пересказ.
+- Паузы тишины: `pause_after` в script.json (2+ сек перед кульминацией), музыка глушится событием `mute`.
+- Звук: `extraEvents()` в render.html → creak / breath / whisper / heart (ускоряющееся) / ring (звон перед скримером); mix.sh `LRA=20`.
+- Движение монстра рывками: `jerky(p, n)`, не плавно.
+- Зритель видит угрозу, которую не видит герой. Страшно > умно: минимум чтения с экрана.
+- Страшные фразы медленнее: `"rate": 0.9–0.95`.

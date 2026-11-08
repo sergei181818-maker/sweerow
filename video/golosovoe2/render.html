@@ -66,6 +66,7 @@ function setup(timeline) {
   if (y) { for (let yr = 1945; yr <= 1974; yr++) EVENTS.push({ type: 'tick', t: yearTime(y, yr) }); }
   const sz = SCENES.find(s => s.id === 'suzuki');
   if (sz) { const l = sz.lines[1]; [0.42, 0.64, 0.86].forEach(k => EVENTS.push({ type: 'pop', t: lerp(l.start, l.end, k) })); EVENTS.push({ type: 'ding', t: sz.lines[2].start + 0.5 }); }
+  if (typeof extraEvents === 'function') EVENTS.push(...extraEvents());
   return { scenes: SCENES.map(s => ({ id: s.id, start: s.start, end: s.end })), events: EVENTS.sort((a, b) => a.t - b.t), chunks: CHUNKS.length };
 }
 const sc = id => SCENES.find(s => s.id === id);
@@ -1449,6 +1450,7 @@ function creepyFace(x, y, s, rot, t, kind) {
   ctx.fillStyle = '#f2efe6'; for (let i = 0; i < 12; i++) { const tx = -70 + i * 12.7, ty = 44 + Math.sin((i / 11) * Math.PI) * 30; ctx.fillRect(tx, ty - 6, 9, 14); }
   ctx.restore();
 }
+function jerky(p, n) { n = n || 6; p = clamp(p); const f = p * n, i = Math.floor(f); return Math.min(1, (i + easeOut(clamp((f - i - 0.7) / 0.3))) / n); }
 function underBed2(t, o) {
   ctx.fillStyle = '#05060c'; ctx.fillRect(0, 0, W, H);
   ctx.save(); ctx.beginPath(); ctx.rect(0, 640, W, 760); ctx.clip();
@@ -1459,8 +1461,10 @@ function underBed2(t, o) {
   ctx.strokeStyle = '#c9c3b8'; ctx.lineCap = 'round';
   [-70, 70].forEach((ox, i) => {
     const hipX = 470 + ox, hipY = 600, kneeX = lerp(470 + ox, 560 + ox, k), kneeY = lerp(1000, 1345, k), footX = lerp(470 + ox, 330 + ox, k), footY = 1350;
-    ctx.lineWidth = 72; ctx.beginPath(); ctx.moveTo(hipX, hipY); ctx.lineTo(kneeX, kneeY); ctx.stroke();
-    ctx.lineWidth = 64; ctx.beginPath(); ctx.moveTo(kneeX, kneeY); ctx.lineTo(footX, footY); ctx.stroke();
+    ctx.strokeStyle = '#bdb6aa'; ctx.lineWidth = 58; ctx.beginPath(); ctx.moveTo(hipX, hipY); ctx.lineTo(kneeX, kneeY); ctx.stroke();
+    ctx.strokeStyle = '#c9c3b8'; ctx.lineWidth = 48; ctx.beginPath(); ctx.moveTo(kneeX, kneeY); ctx.lineTo(footX, footY); ctx.stroke();
+    ctx.fillStyle = '#d6d0c5'; ctx.beginPath(); ctx.ellipse(kneeX, kneeY, 34, 30, 0, 0, 7); ctx.fill();
+    ctx.strokeStyle = 'rgba(60,50,40,0.35)'; ctx.lineWidth = 3; for (let v = 0; v < 3; v++) { ctx.beginPath(); ctx.moveTo(lerp(hipX, kneeX, 0.3 + v * 0.2) - 10, lerp(hipY, kneeY, 0.3 + v * 0.2)); ctx.lineTo(lerp(hipX, kneeX, 0.35 + v * 0.2) + 8, lerp(hipY, kneeY, 0.38 + v * 0.2)); ctx.stroke(); }
     ctx.fillStyle = '#c9c3b8'; ctx.beginPath(); ctx.ellipse(footX + (k > 0.5 ? -30 : 30), footY, 64, 26, 0, 0, 7); ctx.fill();
   });
   // hands on the floor, long fingers creeping forward
@@ -1486,6 +1490,22 @@ function eyesClosed(t, redA) {
   const r = rng(3); for (let i = 0; i < 14; i++) { ctx.beginPath(); let x = r() * W, y = r() * H; ctx.moveTo(x, y); for (let k = 0; k < 6; k++) { x += (r() - 0.5) * 160; y += (r() - 0.5) * 160; ctx.lineTo(x, y); } ctx.stroke(); }
 }
 
+S.teaser = (u, s, t) => {
+  underBed2(t, { knees: 1, hands: 1, head: 0.92, emo: 'shock' });
+  ctx.fillStyle = `rgba(255,0,0,${0.35 * Math.max(0, 1 - u * 1.5)})`; ctx.fillRect(0, 0, W, H);
+  label('ЧАСТЬ 2', 540, 300, 90, '#ffffff', 1, 900, 6);
+};
+function extraEvents() {
+  const E = [], g = id => sc(id);
+  const k = g('knows'), kn = g('knees'), b = g('buzz'), d = g('dark'), br = g('breath'), n = g('near'), o = g('open');
+  if (k) E.push({ type: 'creak', t: k.start + 0.1 });
+  if (kn) { E.push({ type: 'creak', t: kn.start + 0.7 }); E.push({ type: 'creak', t: kn.start + 2.0 }); }
+  if (b && o) E.push({ type: 'heart', t: b.start, dur: o.start - b.start, bpm0: 72, bpm1: 150 });
+  if (d) { E.push({ type: 'breath', t: d.lines[1].start - 0.4, dur: d.end - d.lines[1].start + 0.4 }); E.push({ type: 'whisper', t: d.lines[1].start, dur: d.lines[1].end - d.lines[1].start }); }
+  if (br) { E.push({ type: 'breath', t: br.start, dur: br.lines[1].end - br.start }); E.push({ type: 'mute', t: br.lines[1].end, dur: (n ? n.start : br.end) - br.lines[1].end }); }
+  if (o) E.push({ type: 'ring', t: o.start - 1.4, dur: 1.4 });
+  return E;
+}
 S.recap = (u, s, t) => {
   clockMin = 9;
   underBed2(t, { emo: 'scared' });
@@ -1500,7 +1520,7 @@ S.knows = (u, s, t) => {
 };
 S.knees = (u, s, t) => {
   const l2 = s.lines[1];
-  const kn = clamp((u - 0.8) / 2.2), hands = clamp((t - l2.start) / 1.4), head = clamp((t - l2.start - 1.2) / 2.2);
+  const kn = jerky((u - 0.8) / 2.2, 4), hands = jerky((t - l2.start) / 1.4, 3), head = jerky((t - l2.start - 1.2) / 2.2, 5);
   underBed2(t, { knees: kn, hands, head, emo: head > 0.2 ? 'shock' : 'scared' });
   hud(t, 'НОЧЬ · 03:10', true);
 };
@@ -1534,12 +1554,12 @@ function closeUp(t, o) {
 }
 S.dark = (u, s, t) => {
   const l2 = s.lines[1];
-  closeUp(t, { mom: clamp((u - 0.4) / (s.end - s.start)) * 0.55 });
+  closeUp(t, { mom: jerky((u - 0.4) / (s.end - s.start), 5) * 0.55 });
   if (t > l2.start) { ctx.fillStyle = `rgba(120,0,20,${0.12 + 0.08 * Math.sin(t * 6)})`; ctx.fillRect(0, 0, W, H); }
 };
 S.breath = (u, s, t) => {
   const l2 = s.lines[1]; clockMin = t > l2.start + 1.6 ? 12 : t > l2.start + 0.6 ? 11 : 10;
-  closeUp(t, { mom: 0.55 + 0.45 * clamp(u / 2.5), breath: true });
+  closeUp(t, { mom: 0.55 + 0.45 * jerky(u / 2.5, 3), breath: true });
   if (t > l2.start) { ctx.save(); ctx.font = '200 150px Inter'; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillText(`03:${clockMin}`, 540, 560); ctx.restore(); }
 };
 S.near = (u, s, t) => {
@@ -1571,6 +1591,7 @@ S.cta = (u, s, t) => {
 };
 function stampTimes() {
   const out = [];
+  const tz = sc('teaser'); if (tz) out.push(tz.start + 0.25);
   const k = sc('knees'); if (k) out.push(k.lines[1].start + 1.3);
   const b = sc('buzz'); if (b) out.push(b.start + 0.05);
   const o = sc('open'); if (o) out.push(o.start + 0.05);

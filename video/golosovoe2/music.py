@@ -47,12 +47,19 @@ def kick(at, gain):
     y = np.sin(2 * np.pi * np.cumsum(f) / SR) * np.exp(-tt * 7) * gain
     i = int(at * SR); e = min(N, i + n); L[i:e] += y[:e - i]; R[i:e] += y[:e - i]
 beat = 60 / 88
+HAS_HEART = any(e['type'] == 'heart' for e in ev['events'])
 for s in ev['scenes']:
-    if s['id'] in ('hook', 'twist', 'cta'): continue
+    if HAS_HEART or s['id'] in ('hook', 'twist', 'cta'): continue
     g = {'years': .32, 'final': .3, 'command': .26}.get(s['id'], .18)
     x = s['start'] + 0.3
     while x < s['end'] - 0.1: kick(x, g); x += beat
 L += pad; R += pad
+# ---- mute beds for silent beats ----
+for e in ev['events']:
+    if e['type'] == 'mute':
+        a, b = int(e['t'] * SR), int((e['t'] + e['dur']) * SR); env = np.ones(N); ramp = int(0.25 * SR)
+        env[a:b] = 0.08; env[max(0, a - ramp):a] = np.linspace(1, 0.08, a - max(0, a - ramp)); env[b:b + ramp] = np.linspace(0.08, 1, min(ramp, N - b))
+        L *= env; R *= env
 # ---- SFX ----
 def add(at, y, gain=1.0, pan=0.0):
     i = int(at * SR)
@@ -88,12 +95,45 @@ def pop():
 def ding():
     n = int(1.4 * SR); tt = np.arange(n) / SR
     return sum(np.sin(2 * np.pi * f * tt) * a for f, a in ((1318, .5), (2637, .25), (3951, .12))) * np.exp(-tt * 4) * 0.45
+def creak():
+    n = int(0.9 * SR); tt = np.arange(n) / SR; f = 28 + 40 * np.sin(np.pi * tt / 0.9) ** 2
+    ph = np.cumsum(f) / SR; pulses = (np.mod(ph, 1) < 0.08).astype(float) * (0.6 + 0.4 * rs.random(n))
+    from scipy.signal import butter, lfilter
+    b, a = butter(2, [700 / (SR / 2), 2200 / (SR / 2)], 'band'); y = lfilter(b, a, pulses)
+    return y / (np.abs(y).max() + 1e-9) * np.sin(np.pi * tt / 0.9) * 0.5
+def breath(dur):
+    n = int(dur * SR); tt = np.arange(n) / SR
+    from scipy.signal import butter, lfilter
+    b, a = butter(2, [300 / (SR / 2), 1600 / (SR / 2)], 'band'); y = lfilter(b, a, noise(n))
+    env = np.clip(np.sin(2 * np.pi * 0.55 * tt), 0, 1) ** 2
+    return y / (np.abs(y).max() + 1e-9) * env * 0.35
+def whisper(dur):
+    n = int(dur * SR)
+    from scipy.signal import butter, lfilter
+    b, a = butter(2, [2500 / (SR / 2), 7000 / (SR / 2)], 'band'); y = lfilter(b, a, noise(n))
+    return y / (np.abs(y).max() + 1e-9) * (0.5 + 0.5 * np.sin(np.arange(n) / SR * 2 * np.pi * 3)) * 0.12
+def ring(dur):
+    n = int(dur * SR); tt = np.arange(n) / SR
+    return np.sin(2 * np.pi * 6800 * tt) * (tt / dur) ** 2 * 0.22
+def thump(g):
+    n = int(0.25 * SR); tt = np.arange(n) / SR
+    return np.sin(2 * np.pi * (52 + 30 * np.exp(-tt * 30)) * tt) * np.exp(-tt * 18) * g
 W = whoosh()
+for e in ev['events']:
+    if e['type'] == 'heart':
+        x = e['t']; end = e['t'] + e['dur']
+        while x < end:
+            p = (x - e['t']) / e['dur']; bpm = e['bpm0'] + (e['bpm1'] - e['bpm0']) * p
+            add(x, thump(0.55)); add(x + 0.16, thump(0.35)); x += 60 / bpm
+    elif e['type'] == 'creak': add(e['t'], creak(), 1, 0.3)
+    elif e['type'] == 'breath': add(e['t'], breath(e['dur']), 1, -0.4)
+    elif e['type'] == 'whisper': add(e['t'], whisper(e['dur']), 1, 0.5)
+    elif e['type'] == 'ring': add(e['t'], ring(e['dur']))
 for e in ev['events']:
     k = e['type']
     if k == 'boom': add(e['t'], boom(e.get('soft')))
     elif k == 'whoosh': add(e['t'] - 0.1, W, 1, -0.3)
-    elif k == 'stamp': add(e['t'] + 0.12, stamp(), 1.0)
+    elif k == 'stamp': add(e['t'] + 0.12, stamp(), 1.6)
     elif k == 'tick': add(e['t'], tick(), 1, 0.2)
     elif k == 'pop': add(e['t'], pop())
     elif k == 'ding': add(e['t'], ding())

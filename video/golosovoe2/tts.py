@@ -25,6 +25,8 @@ def fx(a, r, kind):
     return (np.clip(x, -1, 1) * 32767).astype(np.int16)
 RATE = 22050; t = 0.3; tl = []; clean = []; bleep = []
 for i, ln in enumerate(lines):
+    if "pause" in ln:  # silent beat (no voice), still its own scene
+        tl.append({**ln, "text": "", "sub": "", "start": round(t, 3), "end": round(t + ln["pause"], 3)}); t += ln["pause"]; continue
     plain = ln["text"].replace("{", "").replace("}", "")
     p = f"{out}/l{i:02d}.wav"; synth.synth(plain, p, speaker_id=SPK[ln["v"]], speech_rate=ln.get("rate", 1.08))
     w = wave.open(p); RATE = w.getframerate(); a = np.frombuffer(w.readframes(w.getnframes()), np.int16); w.close()
@@ -35,8 +37,8 @@ for i, ln in enumerate(lines):
         s0, s1 = pre / L, (pre + len(m.group(1))) / L; pad = (s1 - s0) * 0.25
         a0, a1 = int(max(0, s0 - pad) * len(c)), int(min(1, s1 + pad) * len(c))
         b[a0:a1] = (np.sin(2 * np.pi * 1000 * np.arange(a1 - a0) / RATE) * 9000).astype(np.int16)
-    if i > 0: t += 0.14 if lines[i - 1]["scene"] == ln["scene"] else 0.34
-    tl.append({**ln, "start": round(t, 3), "end": round(t + len(c) / RATE, 3)}); clean.append((t, c)); bleep.append((t, b)); t += len(c) / RATE
+    if i > 0 and "pause" not in lines[i - 1]: t += 0.14 if lines[i - 1]["scene"] == ln["scene"] else 0.34
+    tl.append({**ln, "start": round(t, 3), "end": round(t + len(c) / RATE, 3)}); clean.append((t, c)); bleep.append((t, b)); t += len(c) / RATE + ln.get("pause_after", 0)
 total = t + 1.4
 for name, segs in (("voice", clean), ("voice_bleep", bleep)):
     buf = np.zeros(int(total * RATE) + 1, np.int16)
