@@ -689,7 +689,8 @@ function face(x, y, s, o, t, emo) {
   const blink = (Math.sin(t * 1.3 + (o.seed || 0)) > 0.985) ? 0.1 : 1;
   const big = emo === 'scared' || emo === 'shock' ? 1.35 : emo === 'shout' ? 1.1 : 1;
   const shake = emo === 'scared' ? Math.sin(t * 40) * 2 : 0;
-  [-38, 38].forEach(ex => {
+  if (emo === 'shut') { ctx.strokeStyle = '#2a1c16'; ctx.lineWidth = 7; [-38, 38].forEach(ex => { ctx.beginPath(); ctx.moveTo(ex - 20, -6); ctx.lineTo(ex + 4 * Math.sign(ex), 4); ctx.lineTo(ex - 20, 14); ctx.stroke(); }); }
+  else [-38, 38].forEach(ex => {
     ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(ex, 2, 20 * big, 24 * big * blink, 0, 0, 7); ctx.fill();
     ctx.fillStyle = '#2a1c16'; ctx.beginPath(); ctx.ellipse(ex + look + shake, 5, 11 * (emo === 'shock' ? 0.7 : 1), 13 * blink * (emo === 'shock' ? 0.7 : 1), 0, 0, 7); ctx.fill();
     ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ex + look + 4, -1, 4 * blink, 0, 7); ctx.fill();
@@ -697,7 +698,7 @@ function face(x, y, s, o, t, emo) {
   if (st === 'teacher') { ctx.strokeStyle = '#2a1c16'; ctx.lineWidth = 5; [-38, 38].forEach(ex => { ctx.beginPath(); ctx.arc(ex, 2, 30, 0, 7); ctx.stroke(); }); ctx.beginPath(); ctx.moveTo(-8, 0); ctx.lineTo(8, 0); ctx.stroke(); }
   // brows
   ctx.strokeStyle = '#3a2618'; ctx.lineWidth = 8;
-  const br = { happy: [-0.1, 0], worried: [0.35, -6], scared: [0.45, -14], shock: [0, -22], shout: [-0.4, 2], doubt: [0.25, -4], calm: [0, -2], proud: [-0.15, -4] }[emo] || [0, 0];
+  const br = { shut: [0.5, -10], happy: [-0.1, 0], worried: [0.35, -6], scared: [0.45, -14], shock: [0, -22], shout: [-0.4, 2], doubt: [0.25, -4], calm: [0, -2], proud: [-0.15, -4] }[emo] || [0, 0];
   [-1, 1].forEach(sd => {
     ctx.save(); ctx.translate(sd * 38, -34 + br[1]); ctx.rotate(sd * br[0] * (emo === 'doubt' && sd > 0 ? -1 : 1));
     ctx.beginPath(); ctx.moveTo(-16, 0); ctx.lineTo(16, 0); ctx.stroke(); ctx.restore();
@@ -711,7 +712,7 @@ function face(x, y, s, o, t, emo) {
   else if (emo === 'doubt') { ctx.beginPath(); ctx.moveTo(-22, 58); ctx.quadraticCurveTo(0, 50, 24, 62); ctx.stroke(); }
   else { ctx.beginPath(); ctx.moveTo(-20, 56); ctx.quadraticCurveTo(0, 50 + (emo === 'worried' ? -4 : 4), 20, 56); ctx.stroke(); }
   // sweat drop
-  if (emo === 'scared' || emo === 'worried') { ctx.fillStyle = '#9fd8ff'; const dy = (t * 60) % 60; ctx.beginPath(); ctx.ellipse(88, -10 + dy, 9, 14, 0, 0, 7); ctx.fill(); }
+  if (emo === 'scared' || emo === 'worried' || emo === 'shut') { ctx.fillStyle = '#9fd8ff'; const dy = (t * 60) % 60; ctx.beginPath(); ctx.ellipse(88, -10 + dy, 9, 14, 0, 0, 7); ctx.fill(); }
   ctx.restore();
 }
 
@@ -1426,147 +1427,139 @@ function stampTimes() {
   return out;
 }
 
-// ===================== scenes: «Голосовое от себя», часть 2 =====================
-function header2(name, status, who, t) {
-  ctx.fillStyle = '#17202f'; ctx.fillRect(-305, -560, 610, 120);
-  ctx.save(); ctx.translate(-215, -500); face(0, 0, 0.36, who === 'mom' ? { ...MOM } : { ...DIMA }, t || 0, 'calm'); ctx.restore();
-  ctx.fillStyle = '#fff'; ctx.font = '800 40px Inter'; ctx.textAlign = 'left'; ctx.fillText(name, -150, -515);
-  ctx.fillStyle = status.startsWith('Я') ? '#ff5a5a' : '#5ee7ff'; ctx.font = '600 28px Inter'; ctx.fillText(status, -150, -472);
-}
-function outBubble(y, txt, k, time) {
-  if (k <= 0) return; ctx.save(); ctx.globalAlpha = clamp(k * 3); ctx.translate(0, (1 - easeOut(k)) * 40);
-  ctx.font = '700 40px Inter'; const w = Math.min(520, ctx.measureText(txt).width + 70);
-  ctx.fillStyle = '#2f6fed'; ctx.beginPath(); ctx.roundRect(270 - w, y - 48, w, 96, 30); ctx.fill();
-  ctx.fillStyle = '#fff'; ctx.textAlign = 'right'; ctx.fillText(txt, 240, y + 2);
+// ===================== scenes: «Голосовое от себя», часть 2 (v2, страшнее) =====================
+function creepyFace(x, y, s, rot, t, kind) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(rot); ctx.scale(s, s);
+  const twitch = Math.sin(t * 23) > 0.92 ? 6 : 0;
+  ctx.translate(twitch, 0);
+  // hair
+  ctx.fillStyle = kind === 'twin' ? '#2b1d14' : '#1a120d';
+  if (kind !== 'twin') { ctx.beginPath(); ctx.roundRect(-120, -130, 240, 330, 70); ctx.fill(); for (let i = 0; i < 9; i++) { ctx.fillRect(-115 + i * 26, 120, 14, 90 + Math.sin(i * 3 + t) * 30); } }
+  // head
+  ctx.fillStyle = kind === 'twin' ? '#e9cdb4' : '#d8d2c8';
+  ctx.beginPath(); ctx.ellipse(0, 0, 100, 112, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = kind === 'twin' ? '#2b1d14' : '#1a120d'; ctx.beginPath(); ctx.ellipse(0, -66, 104, 56, 0, Math.PI, 0); ctx.fill();
+  // eyes: black, tiny white pupils
+  [-38, 38].forEach(ex => {
+    ctx.fillStyle = '#050505'; ctx.beginPath(); ctx.ellipse(ex, -4, 26, 30, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ex + Math.sin(t * 2) * 4, -2, 4, 0, 7); ctx.fill();
+  });
+  // ear-to-ear grin
+  ctx.fillStyle = '#3a0a0a'; ctx.beginPath(); ctx.moveTo(-82, 34); ctx.quadraticCurveTo(0, 120, 82, 34); ctx.quadraticCurveTo(0, 70, -82, 34); ctx.fill();
+  ctx.fillStyle = '#f2efe6'; for (let i = 0; i < 12; i++) { const tx = -70 + i * 12.7, ty = 44 + Math.sin((i / 11) * Math.PI) * 30; ctx.fillRect(tx, ty - 6, 9, 14); }
   ctx.restore();
 }
-function inBubble(lines, y, k) {
-  if (k <= 0) return; ctx.save(); ctx.globalAlpha = clamp(k * 3); ctx.translate(0, (1 - easeOut(k)) * 40);
-  ctx.font = '700 40px Inter'; const w = Math.max(...lines.map(l => ctx.measureText(l).width)) + 70, h = 60 + lines.length * 52;
-  ctx.fillStyle = '#233149'; ctx.beginPath(); ctx.roundRect(-270, y - 40, w, h, 30); ctx.fill();
-  ctx.fillStyle = '#fff'; ctx.textAlign = 'left'; lines.forEach((l, i) => ctx.fillText(l, -240, y + 14 + i * 52));
+function underBed2(t, o) {
+  ctx.fillStyle = '#05060c'; ctx.fillRect(0, 0, W, H);
+  ctx.save(); ctx.beginPath(); ctx.rect(0, 640, W, 760); ctx.clip();
+  ctx.fillStyle = '#101530'; ctx.fillRect(0, 640, W, 760); ctx.fillStyle = '#1a2040'; ctx.fillRect(0, 1180, W, 220);
+  ctx.fillStyle = 'rgba(255,214,150,0.6)'; ctx.fillRect(640, 700, 260, 480); glow(760, 1180, 500, 'rgba(255,200,120,0.25)', 1);
+  const k = o.knees || 0;
+  // legs (from top edge down to floor), bending at the knee
+  ctx.strokeStyle = '#c9c3b8'; ctx.lineCap = 'round';
+  [-70, 70].forEach((ox, i) => {
+    const hipX = 470 + ox, hipY = 600, kneeX = lerp(470 + ox, 560 + ox, k), kneeY = lerp(1000, 1345, k), footX = lerp(470 + ox, 330 + ox, k), footY = 1350;
+    ctx.lineWidth = 72; ctx.beginPath(); ctx.moveTo(hipX, hipY); ctx.lineTo(kneeX, kneeY); ctx.stroke();
+    ctx.lineWidth = 64; ctx.beginPath(); ctx.moveTo(kneeX, kneeY); ctx.lineTo(footX, footY); ctx.stroke();
+    ctx.fillStyle = '#c9c3b8'; ctx.beginPath(); ctx.ellipse(footX + (k > 0.5 ? -30 : 30), footY, 64, 26, 0, 0, 7); ctx.fill();
+  });
+  // hands on the floor, long fingers creeping forward
+  const h = o.hands || 0;
+  if (h > 0) [640, 820].forEach((hx, i) => {
+    const x = lerp(hx + 200, hx, easeOut(h)), y = 1365;
+    ctx.fillStyle = '#d8d2c8'; ctx.beginPath(); ctx.ellipse(x, y, 60, 22, 0, 0, 7); ctx.fill();
+    for (let f = 0; f < 4; f++) { ctx.fillRect(x - 150 + f * 6, y - 14 + f * 8, 110 + Math.sin(t * 3 + f) * 8, 9); }
+  });
+  // head peeking in sideways from the top edge
+  const hd = o.head || 0;
+  if (hd > 0) creepyFace(760, lerp(470, 1060, easeOut(hd)), 1.55, -Math.PI / 2 + 0.15, t, 'mom');
   ctx.restore();
+  ctx.fillStyle = '#1b1426'; ctx.fillRect(0, 560, W, 90); for (let i = 0; i < 8; i++) { ctx.fillStyle = '#140f1d'; ctx.fillRect(i * 150 - 20, 560, 40, 90); }
+  ctx.fillStyle = '#1b1426'; ctx.fillRect(0, 1400, W, 520);
+  ctx.save(); ctx.translate(230, 1700); ctx.rotate(-0.08); if (o.phone) glow(180, -40, 420, `rgba(120,170,255,${o.phone})`, 1); face(0, 0, 1.25, { ...DIMA, look: 0.9 }, t, o.emo || 'scared'); ctx.restore();
+  ctx.fillStyle = '#222a44'; ctx.beginPath(); ctx.roundRect(400, 1650, 640, 140, 60); ctx.fill();
 }
-function vb(y, date, heard, t) {
-  ctx.fillStyle = '#233149'; ctx.beginPath(); ctx.roundRect(-270, y - 58, 470, 116, 30); ctx.fill();
-  ctx.fillStyle = '#5ee7ff'; ctx.beginPath(); ctx.arc(-205, y - 6, 34, 0, 7); ctx.fill();
-  ctx.fillStyle = '#0f1420'; ctx.beginPath(); ctx.moveTo(-215, y - 22); ctx.lineTo(-190, y - 6); ctx.lineTo(-215, y + 10); ctx.fill();
-  const r = rng(Math.floor(y * 7) & 1023);
-  for (let i = 0; i < 22; i++) { const h = 8 + r() * 34; ctx.fillStyle = heard ? '#5ee7ff' : '#55617a'; ctx.beginPath(); ctx.roundRect(-150 + i * 12, y - h / 2 - 8, 7, h, 3); ctx.fill(); }
-  ctx.fillStyle = '#a9b4c8'; ctx.font = '500 24px Inter'; ctx.textAlign = 'right'; ctx.fillText(date + ' · 03:09', 150, y + 40);
-  if (heard) { ctx.strokeStyle = '#5ee7ff'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(160, y + 36); ctx.lineTo(168, y + 44); ctx.lineTo(182, y + 28); ctx.moveTo(172, y + 40); ctx.lineTo(176, y + 44); ctx.lineTo(190, y + 28); ctx.stroke(); }
+function eyesClosed(t, redA) {
+  ctx.fillStyle = '#030102'; ctx.fillRect(0, 0, W, H);
+  glow(540, 900, 900, `rgba(120,10,10,${redA})`, 1);
+  ctx.strokeStyle = `rgba(160,20,20,${redA * 0.6})`; ctx.lineWidth = 3;
+  const r = rng(3); for (let i = 0; i < 14; i++) { ctx.beginPath(); let x = r() * W, y = r() * H; ctx.moveTo(x, y); for (let k = 0; k < 6; k++) { x += (r() - 0.5) * 160; y += (r() - 0.5) * 160; ctx.lineTo(x, y); } ctx.stroke(); }
 }
-function dateOf(n) { const d = new Date(Date.UTC(2026, 10, 8) - n * 864e5); return String(d.getUTCDate()).padStart(2, '0') + '.' + String(d.getUTCMonth() + 1).padStart(2, '0') + '.' + String(d.getUTCFullYear()).slice(2); }
 
 S.recap = (u, s, t) => {
   clockMin = 9;
-  ctx.fillStyle = '#050508'; ctx.fillRect(0, 0, W, H);
-  // two mini panels from part 1
-  ctx.save(); ctx.translate(290, 760); ctx.scale(0.42, 0.42); phone(0, 0, 1, () => { chatHeader(); voiceBubble(-150, 1, t, '03:09', false); }, 0.3); ctx.restore();
-  ctx.save(); ctx.beginPath(); ctx.roundRect(560, 470, 440, 580, 30); ctx.clip(); ctx.translate(560, 470); ctx.scale(0.41, 0.41); underBed(t, 1, 1, 0.3, 'scared'); ctx.restore();
-  label('РАНЕЕ', 540, 300, 64, '#ff3b30', 1, 900, 10);
-  const k = clamp((t - s.lines[0].end + 2.2) * 2);
-  if (k > 0) { ctx.save(); ctx.globalAlpha = k; ctx.fillStyle = 'rgba(255,143,177,0.15)'; ctx.beginPath(); ctx.roundRect(140, 1130, 800, 120, 30); ctx.fill(); label('МАМА: НА ДАЧЕ · 100 КМ', 540, 1192, 50, '#ff8fb1', 1, 900); ctx.restore(); }
+  underBed2(t, { emo: 'scared' });
+  label('РАНЕЕ', 540, 300, 60, '#ff3b30', 1, 900, 10);
+  ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.beginPath(); ctx.roundRect(160, 380, 760, 110, 30); ctx.fill(); ctx.restore();
+  label('МАМА: НА ДАЧЕ · 100 КМ', 540, 437, 50, '#ff8fb1', 1, 900);
 };
-
-S.bed = (u, s, t) => {
-  clockMin = 9;
-  underBed(t, 1, 1, 0.3, u > 1.5 ? 'shock' : 'scared');
-  if (t < s.lines[1].start) label('«Я ЗНАЮ, ЧТО ТЫ НЕ СПИШЬ»', 540, 360, 60, '#ff8fb1', clamp(u * 3), 900);
+S.knows = (u, s, t) => {
+  underBed2(t, { emo: u > 1 ? 'shock' : 'scared' });
+  label('«Я ЗНАЮ, ЧТО ТЫ ПОД КРОВАТЬЮ»', 540, 380, 54, '#ff8fb1', clamp(u * 3), 900);
   hud(t, 'НОЧЬ · 03:10', true);
 };
-
-S.momchat = (u, s, t) => {
-  clockMin = 10;
-  sky('#070912', '#0c1020');
-  const [l1, l2] = s.lines;
-  phone(540, 820, 1.02, () => {
-    header2('Мама', t > l2.start - 0.3 && t < l2.start + 0.3 ? 'печатает...' : 'в сети', 'mom', t);
-    outBubble(-300, 'ты дома?', clamp((t - l1.start - 0.6) / 0.35));
-    inBubble(['Нет, мы на даче.', 'А ты почему не спишь?'], -140, clamp((t - l2.start - 0.4) / 0.35));
-  }, 0.3);
-  ctx.save(); ctx.translate(880, 1660); face(0, 0, 0.62, { ...DIMA, look: -0.6 }, t, t > l2.start + 0.8 ? 'shock' : 'scared'); ctx.restore();
-};
-
-S.leave = (u, s, t) => {
-  clockMin = 10;
-  const d = s.end - s.start;
-  underBed(t, 1 - clamp((u - 1.2) / (d - 1.4)), 1 - clamp(u / 1.4), 0.3, 'worried');
-  hud(t, 'НОЧЬ · 03:11', true);
-};
-
-S.scroll = (u, s, t) => {
-  clockMin = 11;
-  sky('#070912', '#0c1020');
+S.knees = (u, s, t) => {
   const l2 = s.lines[1];
-  const sp = t < l2.start ? 0.3 : 1 + (t - l2.start) * 1.4;
-  const off = Math.pow(Math.max(0, u - 0.6), 1.6) * 260 * sp;
-  phone(540, 820, 1.02, () => {
-    ctx.save(); ctx.beginPath(); ctx.rect(-305, -440, 610, 1080); ctx.clip();
-    for (let i = 0; i < 14; i++) {
-      const n = Math.floor(off / 165) + i, y = 520 - i * 165 + (off % 165);
-      vb(y, dateOf(n), false, t);
-    }
-    ctx.restore();
-    header2('Я', 'в сети', 'me', t);
-  }, 0.3);
-  const n = Math.min(365, Math.floor(off / 165));
-  if (t > l2.start) {
-    ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.beginPath(); ctx.roundRect(180, 1600, 720, 160, 30); ctx.fill(); ctx.restore();
-    label(`${n} ГОЛОСОВЫХ`, 540, 1655, 62, '#ffffff', 1, 900);
-    label(`с ${dateOf(n)} · каждую ночь`, 540, 1720, 36, '#5ee7ff', 1, 700);
-  }
+  const kn = clamp((u - 0.8) / 2.2), hands = clamp((t - l2.start) / 1.4), head = clamp((t - l2.start - 1.2) / 2.2);
+  underBed2(t, { knees: kn, hands, head, emo: head > 0.2 ? 'shock' : 'scared' });
+  hud(t, 'НОЧЬ · 03:10', true);
 };
-
-S.heard = (u, s, t) => {
-  clockMin = 11;
-  sky('#070912', '#0c1020');
-  const z = 1 + 0.35 * ease(clamp(u / 1.5));
-  ctx.save(); ctx.translate(540, 700); ctx.scale(z, z); ctx.translate(-540, -700);
-  phone(540, 820, 1.02, () => {
-    ctx.save(); ctx.beginPath(); ctx.rect(-305, -440, 610, 1080); ctx.clip();
-    for (let i = 0; i < 7; i++) vb(-300 + i * 165, dateOf(300 + i), clamp((u - 0.4 - i * 0.12) * 4) > 0.5, t);
-    ctx.restore(); header2('Я', 'в сети', 'me', t);
-  }, 0.3);
+S.buzz = (u, s, t) => {
+  const l2 = s.lines[1];
+  const sh = u < 1.4 ? Math.sin(t * 70) * 10 : 0;
+  ctx.save(); ctx.translate(sh, 0);
+  underBed2(t, { knees: 1, hands: 1, head: 0.75, emo: 'shock', phone: 0.9 });
   ctx.restore();
-  stamp('ПРОСЛУШАНО', 540, 330, (u - 1.0) / 0.45, '#5ee7ff', -0.07, 100);
-  ctx.save(); ctx.translate(880, 1660); face(0, 0, 0.62, { ...DIMA }, t, 'shock'); ctx.restore();
+  ctx.save(); ctx.translate(290, 420); ctx.scale(0.4, 0.4);
+  phone(0, 0, 1, () => { chatHeader(); voiceBubble(-150, t > l2.start ? clamp((t - l2.start) / (l2.end - l2.start)) : 0, t, '03:10', t > l2.start); }, 0.5);
+  ctx.restore();
+  label('БЖЖЖ', 540, 300, 80, '#9fc0ff', u < 1.4 ? 0.9 : 0, 900, 8);
 };
-
-S.first = (u, s, t) => {
-  clockMin = 12;
-  sky('#060608', '#100a14');
-  const prog = clamp((t - s.lines[1].start) / (s.end - s.lines[1].start));
-  phone(540, 820, 1.02, () => {
-    header2('Я', 'в сети', 'me', t);
-    ctx.fillStyle = '#2a3550'; ctx.beginPath(); ctx.roundRect(-150, -400, 300, 54, 27); ctx.fill();
-    ctx.fillStyle = '#c8d2e6'; ctx.font = '700 28px Inter'; ctx.textAlign = 'center'; ctx.fillText(dateOf(365).replace(/\.(\d\d)$/, '.20$1'), 0, -364);
-    voiceBubble(-220, prog, t, '03:09', prog > 0 && prog < 1);
-    if (prog > 0.6) inBubble(['он уже знает', 'твой голос'], 20, clamp((prog - 0.6) * 5));
-  }, 0.25 + 0.15 * Math.sin(t * 10) * (prog > 0 ? 1 : 0));
-  label('ПЕРВОЕ. ГОД НАЗАД', 540, 100, 46, '#ffd60a', clamp(u * 3), 900, 3);
-  ctx.save(); ctx.translate(880, 1660); face(0, 0, 0.62, { ...DIMA, look: Math.sin(t * 2) * 0.3 }, t, prog > 0.5 ? 'scared' : 'worried'); ctx.restore();
-};
-
-S.rec = (u, s, t) => {
-  clockMin = 12;
-  sky('#120608', '#200a10');
+function closeUp(t, o) {
+  ctx.fillStyle = '#04050a'; ctx.fillRect(0, 0, W, H);
+  glow(400, 1000, 700, 'rgba(60,70,120,0.25)', 1);
+  ctx.fillStyle = '#0c0a14'; ctx.fillRect(0, 0, W, 330); for (let i = 0; i < 8; i++) { ctx.fillStyle = '#08060e'; ctx.fillRect(i * 150 - 20, 0, 40, 330); }
+  // twin lying beside, revealed from darkness (left, behind Dima)
+  if (o.twin > 0) { ctx.save(); ctx.globalAlpha = o.twin; creepyFace(790, 1050, 1.85, -0.12, t, 'twin'); ctx.restore(); }
+  // Dima, eyes shut, trembling
+  const tr = Math.sin(t * 37) * 3;
+  ctx.save(); ctx.translate(360 + tr, 1060); ctx.rotate(-0.12); face(0, 0, 2.0, { ...DIMA }, t, 'shut'); ctx.restore();
+  // the thing approaches from the right
+  if (o.mom > 0) {
+    const x = lerp(1350, 720, easeOut(o.mom));
+    creepyFace(x, 1030, 1.9, -Math.PI / 2 + 0.12, t, 'mom');
+    if (o.breath) { const ph = (t * 0.9) % 1; for (let i = 0; i < 3; i++) { const p = (ph + i / 3) % 1; ctx.save(); ctx.globalAlpha = (1 - p) * 0.3; ctx.fillStyle = '#cfd6e6'; ctx.beginPath(); ctx.ellipse(lerp(x - 160, 520, p), 1060 + Math.sin(i + t) * 20, 50 + p * 120, 26 + p * 50, 0, 0, 7); ctx.fill(); ctx.restore(); } }
+  }
+  label('ГЛАЗА ЗАКРЫТЫ', 540, 160, 40, '#ff3b30', 0.75, 900, 8);
+}
+S.dark = (u, s, t) => {
   const l2 = s.lines[1];
-  const recK = clamp((u - 1.4) * 3);
-  phone(540, 820, 1.02, () => {
-    header2('Я', recK > 0 ? 'Я записывает голосовое...' : 'в сети', 'me', t);
-    voiceBubble(-220, 1, t, '03:09', false);
-    if (recK > 0) {
-      const p = 0.5 + 0.5 * Math.sin(t * 8);
-      ctx.fillStyle = `rgba(255,59,48,${0.6 + 0.4 * p})`; ctx.beginPath(); ctx.arc(0, 380, 70 + p * 10, 0, 7); ctx.fill();
-      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.roundRect(-16, 340, 32, 56, 16); ctx.fill(); ctx.fillRect(-4, 400, 8, 20); ctx.fillRect(-22, 418, 44, 6);
-      ctx.fillStyle = '#ff8a80'; ctx.font = '700 30px Inter'; ctx.textAlign = 'center'; ctx.fillText('0:0' + Math.floor(u - 1.4), 0, 490);
-    }
-  }, 0.3);
-  // hand holding phone, kid silent
-  if (t > l2.start) { glow(540, 1650, 500, 'rgba(255,40,40,0.25)', 1); ctx.save(); ctx.translate(880, 1660); face(0, 0, 0.62, { ...DIMA }, t, 'shock'); ctx.restore(); label('ТЫ МОЛЧИШЬ', 330, 1660, 52, '#ffffff', clamp((t - l2.start) * 3), 900, 4); }
+  closeUp(t, { mom: clamp((u - 0.4) / (s.end - s.start)) * 0.55 });
+  if (t > l2.start) { ctx.fillStyle = `rgba(120,0,20,${0.12 + 0.08 * Math.sin(t * 6)})`; ctx.fillRect(0, 0, W, H); }
 };
-
+S.breath = (u, s, t) => {
+  const l2 = s.lines[1]; clockMin = t > l2.start + 1.6 ? 12 : t > l2.start + 0.6 ? 11 : 10;
+  closeUp(t, { mom: 0.55 + 0.45 * clamp(u / 2.5), breath: true });
+  if (t > l2.start) { ctx.save(); ctx.font = '200 150px Inter'; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillText(`03:${clockMin}`, 540, 560); ctx.restore(); }
+};
+S.near = (u, s, t) => {
+  const l2 = s.lines[1];
+  // the thing is gone; the twin fades in beside Dima
+  closeUp(t, { mom: 1 - clamp(u / 0.6), twin: clamp((t - l2.start - 1.2) / 2.5) });
+  if (t > l2.start + 0.4) label('НЕ ИЗ ТЕЛЕФОНА', 540, 560, 64, '#5ee7ff', clamp((t - l2.start - 0.4) * 3), 900, 4);
+};
+S.open = (u, s, t) => {
+  // eyelids open a slit, then the twin face fills the frame
+  const k = clamp(u / 0.5);
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+  ctx.save(); ctx.beginPath(); ctx.ellipse(540, 900, 700, lerp(10, 640, easeOut(k)), 0, 0, 7); ctx.clip();
+  ctx.fillStyle = '#1a1420'; ctx.fillRect(0, 0, W, H);
+  const sh = Math.sin(t * 80) * 14;
+  creepyFace(540 + sh, 900, lerp(2.2, 4.2, easeOut(k)), 0.12, t, 'twin');
+  ctx.fillStyle = `rgba(255,0,0,${0.25 + 0.2 * Math.sin(t * 30)})`; ctx.fillRect(0, 0, W, H);
+  ctx.restore();
+  if (u > s.end - s.start - 0.35) { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); }
+};
 S.cta = (u, s, t) => {
   ctx.fillStyle = '#050508'; ctx.fillRect(0, 0, W, H);
   const k = backOut(u / 0.45);
@@ -1575,11 +1568,14 @@ S.cta = (u, s, t) => {
   ctx.font = '800 60px Inter'; ctx.fillStyle = '#ff3b30'; ctx.fillText('ЗАВТРА', 0, 120); ctx.restore();
   const p = 1 + 0.04 * Math.sin(t * 7), k2 = backOut((u - 0.5) / 0.45);
   if (k2 > 0) { ctx.save(); ctx.translate(540, 900); ctx.scale(k2 * p, k2 * p); ctx.fillStyle = '#fe2c55'; ctx.beginPath(); ctx.roundRect(-330, -90, 660, 180, 90); ctx.fill(); ctx.fillStyle = '#fff'; ctx.font = '900 74px Inter'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('ПОДПИСАТЬСЯ', 0, 6); ctx.restore(); }
-  ctx.save(); ctx.globalAlpha = 0.5 + 0.5 * Math.sin(t * 4); ctx.fillStyle = 'rgba(40,50,75,0.95)'; ctx.beginPath(); ctx.roundRect(240, 1100, 600, 120, 30); ctx.fill();
-  ctx.fillStyle = '#fff'; ctx.font = '800 32px Inter'; ctx.textAlign = 'left'; ctx.fillText('Я', 280, 1145); ctx.fillStyle = '#ff8a80'; ctx.font = '500 30px Inter'; ctx.fillText('записывает голосовое...', 280, 1188); ctx.restore();
 };
-
-function stampTimes() { const out = []; const h = sc('heard'); if (h) out.push(h.start + 1.0); return out; }
+function stampTimes() {
+  const out = [];
+  const k = sc('knees'); if (k) out.push(k.lines[1].start + 1.3);
+  const b = sc('buzz'); if (b) out.push(b.start + 0.05);
+  const o = sc('open'); if (o) out.push(o.start + 0.05);
+  return out;
+}
 
 // ===================== subtitles =====================
 function subtitles(t) {
@@ -1606,7 +1602,7 @@ function subtitles(t) {
       ctx.save(); ctx.translate(cx, y); ctx.scale(sc, sc); ctx.textAlign = 'center';
       ctx.lineJoin = 'round'; ctx.lineWidth = 20; ctx.strokeStyle = '#000'; ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 24; ctx.shadowOffsetY = 8;
       ctx.strokeText(words[i], 0, 0); ctx.shadowColor = 'transparent';
-      const vv = TL.lines[wd.li].v; const base = vv === 'me' ? '#5ee7ff' : vv === 'mom' ? '#ff8fb1' : '#ffffff';
+      const vv = TL.lines[wd.li].v; const base = (vv === 'me' || vv === 'near') ? '#5ee7ff' : (vv === 'mom' || vv === 'creep') ? '#ff8fb1' : '#ffffff';
       ctx.fillStyle = /\*/.test(words[i]) ? '#ff3b30' : active ? '#ffd60a' : base;
       ctx.fillText(words[i], 0, 0); ctx.restore();
       x += widths[k] + space;

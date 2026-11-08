@@ -4,7 +4,7 @@ import json, sys, wave, os, re, numpy as np
 from scipy.signal import butter, lfilter
 from vosk_tts import Model, Synth
 model = sys.argv[1]; out = sys.argv[2] if len(sys.argv) > 2 else "build"; os.makedirs(out, exist_ok=True)
-SPK = {"nar": 4, "me": 3, "mom": 0}
+SPK = {"nar": 4, "me": 3, "mom": 0, "creep": 0, "near": 3}
 synth = Synth(Model(model_path=model)); lines = json.load(open("script.json", encoding="utf-8"))
 def fx(a, r, kind):
     x = a.astype(np.float32) / 32768
@@ -14,6 +14,14 @@ def fx(a, r, kind):
     if kind == "mom":
         b, c = butter(3, 1800 / (r / 2)); x = lfilter(b, c, x) * 0.8
         d = int(0.09 * r); y = x.copy(); y[d:] += x[:-d] * 0.35; y[2 * d:] += x[:-2 * d] * 0.18; x = y
+    if kind == "creep":  # mom voice pitched down + slowed, close and dry with a long tail
+        from scipy.signal import resample
+        x = resample(x, int(len(x) * 1.18)) * 0.9
+        d = int(0.13 * r); y = x.copy(); y[d:] += x[:-d] * 0.3; y[2 * d:] += x[:-2 * d] * 0.15; x = y
+        x *= 0.85 + 0.15 * np.sin(np.arange(len(x)) / r * 2 * np.pi * 5)
+    if kind == "near":  # your own voice, whisper-close: thin, slightly slowed
+        from scipy.signal import resample
+        b, c = butter(2, 500 / (r / 2), "high"); x = lfilter(b, c, x); x = resample(x, int(len(x) * 1.06)) * 0.75
     return (np.clip(x, -1, 1) * 32767).astype(np.int16)
 RATE = 22050; t = 0.3; tl = []; clean = []; bleep = []
 for i, ln in enumerate(lines):
