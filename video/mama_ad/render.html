@@ -1,0 +1,217 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>html,body{margin:0;background:#000}canvas{display:block}</style>
+</head><body>
+<canvas id="c" width="1080" height="1920"></canvas>
+<script>
+// «Уговор» — product-launch style ad. Kinetic type, glass cards, beat-synced.
+const W = 1080, H = 1920, cv = document.getElementById('c'), ctx = cv.getContext('2d');
+let TL, SC = [], BEAT = 0.5;
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const lerp = (a, b, k) => a + (b - a) * k;
+const eo = k => 1 - Math.pow(1 - clamp(k), 4);
+const eio = k => (k = clamp(k), k < .5 ? 8 * k ** 4 : 1 - Math.pow(-2 * k + 2, 4) / 2);
+const back = k => { k = clamp(k); const c1 = 1.6, c3 = c1 + 1; return 1 + c3 * Math.pow(k - 1, 3) + c1 * Math.pow(k - 1, 2); };
+function rng(s) { s >>>= 0; return () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296; }
+const sc = id => SC.find(s => s.id === id);
+const DISP = '"Inter Display", Inter, sans-serif';
+
+function setup(tl) {
+  TL = tl; BEAT = 60 / tl.bpm;
+  SC = tl.lines.map(l => ({ id: l.scene, start: l.start, end: l.end, lines: [l] }));
+  const E = [];
+  SC.forEach((s, i) => { if (i > 0) E.push({ type: 'whoosh', t: s.start - 0.22 }); });
+  const lg = sc('logo'), pr = sc('present'), th = sc('thanks');
+  E.push({ type: 'riser', t: pr.start, dur: lg.start - pr.start });
+  E.push({ type: 'drop', t: lg.start }); E.push({ type: 'impact', t: lg.start });
+  E.push({ type: 'outro', t: th.start });
+  ['stop', 'price', 'zero', 'finale'].forEach(id => E.push({ type: 'impact', t: sc(id).start + (id === 'price' ? BEAT * 2 : 0.05) }));
+  const pc = sc('problem'); [0, 2, 4].forEach(b => E.push({ type: 'click', t: pc.start + b * BEAT }));
+  const cd = sc('card'); [2, 4].forEach(b => E.push({ type: 'click', t: cd.start + b * BEAT }));
+  const bt = sc('button'); E.push({ type: 'click', t: bt.start + BEAT * 5 }); E.push({ type: 'impact', t: bt.start + BEAT * 5.1 });
+  return { scenes: SC.map(s => ({ id: s.id, start: s.start, end: s.end })), events: E.sort((a, b) => a.t - b.t), bpm: tl.bpm, duration: tl.duration };
+}
+
+// ---------- look ----------
+function bg(t, hue, intensity) {
+  ctx.fillStyle = '#060608'; ctx.fillRect(0, 0, W, H);
+  const orbs = [[0.25, 0.3, 700, hue], [0.8, 0.55, 650, hue + 40], [0.4, 0.85, 600, hue - 50]];
+  orbs.forEach(([x, y, r, h], i) => {
+    const cx = W * x + Math.sin(t * 0.3 + i * 2) * 120, cy = H * y + Math.cos(t * 0.25 + i) * 140;
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    g.addColorStop(0, `hsla(${h},85%,55%,${0.35 * (intensity ?? 1)})`); g.addColorStop(1, 'hsla(0,0%,0%,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  });
+}
+function bokeh(t, n, seed) { const r = rng(seed); for (let i = 0; i < n; i++) { const x = r() * W, y = (r() * H - t * (20 + r() * 40)) % H, s = 2 + r() * 5; ctx.fillStyle = `rgba(255,255,255,${0.15 + 0.25 * Math.abs(Math.sin(t + i))})`; ctx.beginPath(); ctx.arc(x, y < 0 ? y + H : y, s, 0, 7); ctx.fill(); } }
+// masked rise-in text with tightening tracking
+function rise(text, x, y, size, k, o = {}) {
+  if (k <= 0) return; k = clamp(k);
+  ctx.save(); ctx.font = `${o.weight || 900} ${size}px ${DISP}`; ctx.textAlign = o.align || 'center'; ctx.textBaseline = 'alphabetic';
+  ctx.letterSpacing = `${lerp(o.track0 ?? 18, o.track ?? -2, eo(k))}px`;
+  const m = ctx.measureText(text), h = size * 1.15;
+  ctx.beginPath(); ctx.rect(-W, y - h, 3 * W, h + size * 0.3); ctx.clip();
+  const dy = (1 - eo(k)) * h;
+  if (o.grad) { const g = ctx.createLinearGradient(x - m.width / 2, 0, x + m.width / 2, 0); const p = ((o.t || 0) * 0.35) % 1.6 - 0.3; o.grad.forEach(([q, c]) => g.addColorStop(q, c)); ctx.fillStyle = g; }
+  else ctx.fillStyle = o.color || '#f5f5f7';
+  ctx.globalAlpha = (o.alpha ?? 1) * clamp(k * 2.5);
+  ctx.fillText(text, x, y + dy);
+  if (o.shine) { const p = (((o.t || 0) * 0.5) % 2) - 0.5; const g = ctx.createLinearGradient(x - m.width / 2, 0, x + m.width / 2, 0); g.addColorStop(clamp(p - 0.1), 'rgba(255,255,255,0)'); g.addColorStop(clamp(p), 'rgba(255,255,255,0.85)'); g.addColorStop(clamp(p + 0.1), 'rgba(255,255,255,0)'); ctx.globalCompositeOperation = 'source-atop'; ctx.fillStyle = g; ctx.fillText(text, x, y + dy); }
+  ctx.restore();
+}
+function fade(text, x, y, size, k, color, weight) { if (k <= 0) return; ctx.save(); ctx.globalAlpha = clamp(k); ctx.font = `${weight || 600} ${size}px Inter`; ctx.textAlign = 'center'; ctx.fillStyle = color || '#a1a1aa'; ctx.fillText(text, x, y + (1 - eo(k)) * 20); ctx.restore(); }
+function glass(x, y, w, h, r, k, tint) {
+  if (k <= 0) return; ctx.save(); ctx.globalAlpha = clamp(k * 1.5); ctx.translate(0, (1 - eo(k)) * 60);
+  ctx.fillStyle = tint || 'rgba(255,255,255,0.07)'; ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.16)'; ctx.lineWidth = 2; ctx.stroke();
+  const g = ctx.createLinearGradient(0, y, 0, y + h * 0.5); g.addColorStop(0, 'rgba(255,255,255,0.10)'); g.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = g; ctx.fill();
+  ctx.restore();
+}
+function strike(x0, x1, y, k, col) { if (k <= 0) return; ctx.save(); ctx.strokeStyle = col || '#ff453a'; ctx.lineWidth = 12; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(lerp(x0, x1, eo(k)), y); ctx.stroke(); ctx.restore(); }
+function check(x, y, s, k, col) { if (k <= 0) return; ctx.save(); ctx.translate(x, y); ctx.scale(s, s); ctx.strokeStyle = col || '#30d158'; ctx.lineWidth = 9; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath(); const p = eo(k); ctx.moveTo(-18, 0); if (p < 0.4) ctx.lineTo(lerp(-18, -4, p / 0.4), lerp(0, 14, p / 0.4)); else { ctx.lineTo(-4, 14); ctx.lineTo(lerp(-4, 22, (p - 0.4) / 0.6), lerp(14, -16, (p - 0.4) / 0.6)); } ctx.stroke(); ctx.restore(); }
+function ring(x, y, r, p, col, w) { ctx.save(); ctx.lineCap = 'round'; ctx.lineWidth = w || 26; ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.stroke(); ctx.strokeStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 30; ctx.beginPath(); ctx.arc(x, y, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * clamp(p)); ctx.stroke(); ctx.restore(); }
+const kb = (s, t, b) => (t - s.start - b * BEAT) / (BEAT * 1.2); // reveal progress starting at beat b
+
+// ---------- scenes ----------
+const S = {};
+S.intro = (u, s, t) => {
+  bg(t, 260, clamp(u / 2)); bokeh(t, 30, 1);
+  rise('Мама.', 540, 900, 170, kb(s, t, 0.5), { t, shine: true });
+  fade('мы тут кое-что придумали', 540, 1040, 46, kb(s, t, 3), '#a1a1aa');
+};
+S.present = (u, s, t) => {
+  bg(t, 250, 0.8); bokeh(t, 40, 2);
+  fade('ПРЕДСТАВЛЯЕМ', 540, 960, 44, kb(s, t, 0), '#d4d4d8', 700);
+  // light streak before the drop
+  const p = clamp(u / (s.end - s.start)); ctx.save(); ctx.globalAlpha = p * 0.8; const g = ctx.createLinearGradient(0, 0, W, 0); g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, 'rgba(255,255,255,0.9)'); g.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = g; ctx.fillRect(0, 1000, W, 3 + p * 6); ctx.restore();
+};
+S.logo = (u, s, t) => {
+  bg(t, 280, 1); bokeh(t, 50, 3);
+  const k = kb(s, t, 0);
+  ctx.save(); const z = lerp(1.25, 1, eo(k)); ctx.translate(540, 900); ctx.scale(z, z); ctx.translate(-540, -900);
+  rise('Уговор', 540, 960, 230, k, { t, grad: [[0, '#ff9ff3'], [0.5, '#f5f5f7'], [1, '#7ab8ff']], shine: true, track0: 40, track: -6 });
+  ctx.restore();
+  fade('Новый способ жить без лишних трат.', 540, 1090, 44, kb(s, t, 3), '#d4d4d8', 500);
+  fade('ВЕРСИЯ ДЛЯ МАМЫ', 540, 1180, 30, kb(s, t, 5), '#8e8e93', 700);
+};
+S.problem = (u, s, t) => {
+  bg(t, 0, 0.6);
+  ['Яндекс Еда.', 'Самокат.', 'Ещё доставка.'].forEach((w, i) => {
+    const y = 760 + i * 190, k = kb(s, t, i * 2);
+    rise(w, 540, y, 120, k, { color: '#f5f5f7' });
+    const m = 120 * w.length * 0.27; strike(540 - m, 540 + m, y - 40, kb(s, t, i * 2 + 1), '#ff453a');
+  });
+  fade('всё — с твоей карты', 540, 1360, 42, kb(s, t, 4.5), '#ff8a80', 600);
+};
+S.stop = (u, s, t) => {
+  bg(t, 350, 0.9);
+  const k = clamp(u / 0.18); ctx.save(); ctx.translate(540, 960); ctx.scale(lerp(1.6, 1, eo(k)), lerp(1.6, 1, eo(k))); ctx.translate(-540, -960);
+  rise('Хватит.', 540, 1010, 220, k * 2, { color: '#ffffff' }); ctx.restore();
+};
+S.price = (u, s, t) => {
+  bg(t, 140, 1); bokeh(t, 40, 4);
+  fade('Всё включено. Каждую неделю.', 540, 640, 42, kb(s, t, 0), '#a1a1aa', 600);
+  const k = kb(s, t, 2), v = Math.round(5000 * eo(clamp((t - s.start - 2 * BEAT) / (BEAT * 2))));
+  if (k > 0) {
+    ctx.save(); ctx.font = `900 260px ${DISP}`; ctx.textAlign = 'center'; ctx.letterSpacing = '-8px';
+    const g = ctx.createLinearGradient(0, 760, 0, 1060); g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#7dffb0'); ctx.fillStyle = g; ctx.shadowColor = 'rgba(48,209,88,0.6)'; ctx.shadowBlur = 60 * clamp(k);
+    ctx.globalAlpha = clamp(k * 2); ctx.fillText(v.toLocaleString('ru-RU') + ' ₽', 540, 1020); ctx.restore();
+  }
+  rise('в неделю', 540, 1140, 80, kb(s, t, 4.5), { color: '#30d158', weight: 800 });
+};
+S.zero = (u, s, t) => {
+  bg(t, 210, 0.9);
+  const k = kb(s, t, 0);
+  ring(540, 820, 230, eo(clamp(k)), '#0a84ff', 30);
+  rise('0', 540, 905, 260, k, { color: '#ffffff' });
+  rise('доставок с твоей карты', 540, 1200, 70, kb(s, t, 2), { color: '#f5f5f7', weight: 800 });
+  fade('ни Яндекс Еды, ни Самоката', 540, 1290, 40, kb(s, t, 3.5), '#8e8e93', 600);
+};
+S.card = (u, s, t) => {
+  bg(t, 230, 0.8);
+  // floating card
+  const k = kb(s, t, 0), fl = Math.sin(t * 1.6) * 12;
+  ctx.save(); ctx.globalAlpha = clamp(k * 2); ctx.translate(540, 560 + fl + (1 - eo(k)) * 120); ctx.rotate(-0.06 + Math.sin(t) * 0.02);
+  const g = ctx.createLinearGradient(-300, -180, 300, 180); g.addColorStop(0, '#3a3a5c'); g.addColorStop(1, '#14141f'); ctx.fillStyle = g; ctx.shadowColor = 'rgba(120,120,255,0.4)'; ctx.shadowBlur = 80;
+  ctx.beginPath(); ctx.roundRect(-300, -185, 600, 370, 34); ctx.fill(); ctx.shadowColor = 'transparent';
+  ctx.fillStyle = '#d4af37'; ctx.beginPath(); ctx.roundRect(-230, -80, 90, 66, 10); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.font = '600 34px Inter'; ctx.textAlign = 'left'; ctx.fillText('КАРТА МАМЫ', -230, 120); ctx.fillText('•••• ••••', 80, 120);
+  ctx.restore();
+  rise('Только для главного', 540, 930, 76, kb(s, t, 1), { color: '#f5f5f7', weight: 800 });
+  [['Еда во ВкусВилле', 'когда дома пусто'], ['Такси', 'когда нужно доехать']].forEach(([a, b], i) => {
+    const kk = kb(s, t, 2 + i * 2), y = 1030 + i * 210;
+    glass(110, y, 860, 170, 40, kk);
+    if (kk > 0) { ctx.save(); ctx.globalAlpha = clamp(kk * 2); ctx.translate(0, (1 - eo(kk)) * 60); check(190, y + 85, 1.6, kk - 0.3); ctx.fillStyle = '#f5f5f7'; ctx.font = `800 52px ${DISP}`; ctx.textAlign = 'left'; ctx.fillText(a, 260, y + 82); ctx.fillStyle = '#8e8e93'; ctx.font = '500 34px Inter'; ctx.fillText(b, 260, y + 132); ctx.restore(); }
+  });
+};
+S.clean = (u, s, t) => {
+  bg(t, 170, 0.8); bokeh(t, 25, 5);
+  rise('Уборка.', 540, 860, 150, kb(s, t, 0), { color: '#ffffff' });
+  rise('Как и раньше.', 540, 1010, 90, kb(s, t, 1.5), { color: '#64d2ff', weight: 800 });
+  rise('По максимуму.', 540, 1130, 90, kb(s, t, 3), { color: '#64d2ff', weight: 800 });
+  // sparkle sweep
+  const p = clamp((t - s.start - BEAT * 1.5) / (BEAT * 3)); for (let i = 0; i < 12; i++) { const a = (p * 1.4 - i * 0.05); if (a <= 0 || a >= 1) continue; ctx.save(); ctx.globalAlpha = Math.sin(a * Math.PI); ctx.translate(lerp(120, 960, a), 1180 - Math.sin(a * Math.PI) * 200 + i * 8); ctx.rotate(t * 3 + i); ctx.fillStyle = '#ffffff'; ctx.beginPath(); for (let q = 0; q < 8; q++) { const rr = q % 2 ? 6 : 18; ctx.lineTo(Math.cos(q * Math.PI / 4) * rr, Math.sin(q * Math.PI / 4) * rr); } ctx.fill(); ctx.restore(); }
+};
+S.compare = (u, s, t) => {
+  bg(t, 270, 0.7);
+  rise('Было → Стало', 540, 470, 86, kb(s, t, 0), { color: '#f5f5f7', weight: 800 });
+  const rows = [['Доставки с карты мамы', 'Ноль'], ['Сюрпризы в выписке', 'Понятные траты'], ['Траты непонятно куда', '5 000 ₽ и точка'], ['Уборка', 'Уборка, как раньше']];
+  rows.forEach(([a, b], i) => {
+    const k = kb(s, t, 1 + i * 1.5), y = 580 + i * 220;
+    glass(70, y, 440, 180, 32, k, 'rgba(255,69,58,0.10)'); glass(570, y, 440, 180, 32, k, 'rgba(48,209,88,0.12)');
+    if (k > 0) { ctx.save(); ctx.globalAlpha = clamp(k * 2); ctx.translate(0, (1 - eo(k)) * 60); ctx.font = '600 34px Inter'; ctx.textAlign = 'center'; ctx.fillStyle = '#ff8a80';
+      wrap(a, 290, y + 80, 380, 42); ctx.fillStyle = '#7dffb0'; ctx.font = `800 38px ${DISP}`; wrap(b, 790, y + 80, 380, 44); ctx.restore(); }
+  });
+};
+function wrap(text, x, y, maxW, lh) { const words = text.split(' '); let line = '', lines = []; words.forEach(w => { const tt = line ? line + ' ' + w : w; if (ctx.measureText(tt).width > maxW && line) { lines.push(line); line = w; } else line = tt; }); lines.push(line); lines.forEach((l, i) => ctx.fillText(l, x, y + (i - (lines.length - 1) / 2) * lh + 12)); }
+S.finale = (u, s, t) => {
+  bg(t, 280, 1); bokeh(t, 50, 6);
+  rise('Уговор', 540, 900, 200, kb(s, t, 0), { t, grad: [[0, '#ff9ff3'], [0.5, '#f5f5f7'], [1, '#7ab8ff']], shine: true });
+  fade('Доступно с понедельника.', 540, 1030, 48, kb(s, t, 2), '#f5f5f7', 600);
+  fade('Нужна только твоя подпись.', 540, 1100, 40, kb(s, t, 3.5), '#8e8e93', 500);
+};
+S.button = (u, s, t) => {
+  bg(t, 300, 0.9);
+  rise('Согласна?', 540, 760, 130, kb(s, t, 0), { color: '#ffffff' });
+  const k = kb(s, t, 1.5), press = t > s.start + BEAT * 5 && t < s.start + BEAT * 5.4 ? 0.92 : 1, done = t > s.start + BEAT * 5.2;
+  if (k > 0) {
+    ctx.save(); ctx.translate(540, 1000); const p = (done ? 1 : 1 + 0.03 * Math.sin(t * 6)) * press * lerp(0.7, 1, back(k)); ctx.scale(p, p); ctx.globalAlpha = clamp(k * 2);
+    ctx.fillStyle = done ? '#30d158' : '#0a84ff'; ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 50; ctx.beginPath(); ctx.roundRect(-300, -85, 600, 170, 85); ctx.fill(); ctx.shadowColor = 'transparent';
+    ctx.fillStyle = '#fff'; ctx.font = `800 64px ${DISP}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(done ? 'Договорились' : 'Согласиться', 0, 4); ctx.restore();
+    if (done) check(540, 1180, 3, (t - s.start - BEAT * 5.2) / (BEAT * 1.2));
+  }
+  // cursor moving in to tap
+  const ck = clamp((t - s.start - BEAT * 3) / (BEAT * 2));
+  if (ck > 0 && !done) { ctx.save(); ctx.translate(lerp(900, 600, eio(ck)), lerp(1500, 1040, eio(ck))); ctx.scale(press * 1.4, press * 1.4); ctx.fillStyle = '#fff'; ctx.strokeStyle = '#111'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, 70); ctx.lineTo(18, 54); ctx.lineTo(32, 84); ctx.lineTo(44, 78); ctx.lineTo(30, 50); ctx.lineTo(54, 50); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore(); }
+};
+S.thanks = (u, s, t) => {
+  bg(t, 330, 1); bokeh(t, 60, 7);
+  rise('Спасибо, мам.', 540, 930, 130, kb(s, t, 0), { t, shine: true });
+  // heart
+  const k = kb(s, t, 2); if (k > 0) { ctx.save(); ctx.translate(540, 1120); const p = back(k) * (1 + 0.06 * Math.sin(t * 7)); ctx.scale(p * 2.6, p * 2.6); ctx.fillStyle = '#ff375f'; ctx.shadowColor = '#ff375f'; ctx.shadowBlur = 25; ctx.beginPath(); ctx.moveTo(0, 14); ctx.bezierCurveTo(-34, -14, -16, -42, 0, -22); ctx.bezierCurveTo(16, -42, 34, -14, 0, 14); ctx.fill(); ctx.restore(); }
+};
+
+// ---------- frame ----------
+const grain = document.createElement('canvas'); grain.width = grain.height = 512;
+(() => { const g = grain.getContext('2d'), im = g.createImageData(512, 512), r = rng(9); for (let i = 0; i < im.data.length; i += 4) { const v = r() * 255; im.data[i] = im.data[i + 1] = im.data[i + 2] = v; im.data[i + 3] = 14; } g.putImageData(im, 0, 0); })();
+function render(t, frame) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+  const i = Math.max(0, SC.findIndex(s => t >= s.start && t < s.end)), s = SC[SC.findIndex(s => t >= s.start && t < s.end) < 0 ? SC.length - 1 : i];
+  const u = t - s.start;
+  // subtle beat pulse after the drop
+  const lg = sc('logo'), th = sc('thanks'); const onBeat = t > lg.start && t < th.start ? Math.exp(-(((t - lg.start) % BEAT)) * 10) : 0;
+  ctx.save(); const z = 1 + 0.012 * onBeat + 0.02 * (u / (s.end - s.start)); ctx.translate(540, 960); ctx.scale(z, z); ctx.translate(-540, -960);
+  S[s.id](u, s, t); ctx.restore();
+  // cross-dissolve to black between scenes
+  const d = s.end - s.start; if (d - u < 0.12) { ctx.fillStyle = `rgba(0,0,0,${(1 - (d - u) / 0.12) * 0.8})`; ctx.fillRect(0, 0, W, H); }
+  if (u < 0.1 && i > 0) { ctx.fillStyle = `rgba(0,0,0,${(1 - u / 0.1) * 0.8})`; ctx.fillRect(0, 0, W, H); }
+  // vignette + grain
+  const g = ctx.createRadialGradient(540, 960, 500, 540, 960, 1250); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.5)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  const r = rng(frame * 13 + 1), ox = Math.floor(r() * 512), oy = Math.floor(r() * 512);
+  ctx.save(); ctx.globalCompositeOperation = 'overlay'; ctx.fillStyle = ctx.createPattern(grain, 'repeat'); ctx.translate(-ox, -oy); ctx.fillRect(ox, oy, W, H); ctx.restore();
+  if (t < 0.3) { ctx.fillStyle = `rgba(0,0,0,${1 - t / 0.3})`; ctx.fillRect(0, 0, W, H); }
+  if (TL.duration - t < 0.6) { ctx.fillStyle = `rgba(0,0,0,${1 - (TL.duration - t) / 0.6})`; ctx.fillRect(0, 0, W, H); }
+}
+window.setup = setup; window.render = render;
+</script>
+</body></html>
