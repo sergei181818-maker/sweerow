@@ -62,6 +62,15 @@ for e in ev['events']:
     elif ty == 'whoosh':
         n = int(0.45 * SR); tt = np.arange(n) / SR; env = np.sin(np.pi * tt / 0.45) ** 2
         add(e['t'], lp(rs.standard_normal(n), 2500) * env * 0.18, 1, 0.3)
+    elif ty == 'city':
+        n = int(e['dur'] * SR); tt = np.arange(n) / SR; y = lp(rs.standard_normal(n), 900) * 0.25 + lp(hp(rs.standard_normal(n), 300), 2500) * 0.06 * (0.6 + 0.4 * np.sin(tt * 1.3))
+        for hz, at in ((440, 1.2), (392, 3.1)):
+            m = int(0.35 * SR); i0 = int(at * SR)
+            if i0 + m < n: y[i0:i0 + m] += np.sign(np.sin(2 * np.pi * hz * np.arange(m) / SR)) * 0.04 * np.exp(-np.arange(m) / SR * 4)
+        y *= np.clip(tt / 0.8, 0, 1) * np.clip((e['dur'] - tt) / 0.8, 0, 1); add(e['t'], y)
+    elif ty == 'firework':
+        n = int(1.4 * SR); tt = np.arange(n) / SR; y = lp(rs.standard_normal(n), 4000) * np.exp(-tt * 6) * 0.5 + hp(rs.standard_normal(n), 5000) * (rs.random(n) < 0.004) * np.exp(-tt * 2) * 0.6
+        add(e['t'], y, 1, 0.5 if int(e['t'] * 10) % 2 else -0.5)
     elif ty == 'click':
         n = int(0.04 * SR); tt = np.arange(n) / SR; add(e['t'], np.sin(2 * np.pi * 1800 * tt) * np.exp(-tt * 120) * 0.35)
 fo = np.clip((T - t) / 2.0, 0, 1); L *= fo; R *= fo

@@ -21,8 +21,11 @@ function setup(tl) {
   SC = tl.lines.map(l => ({ id: l.scene, start: l.start, end: l.end, lines: [l] }));
   const E = [];
   SC.forEach((s, i) => { if (i > 0) E.push({ type: 'whoosh', t: s.start - 0.22 }); });
-  const lg = sc('logo'), pr = sc('present'), th = sc('thanks');
-  E.push({ type: 'riser', t: pr.start, dur: lg.start - pr.start });
+  const lg = sc('logo'), ts = sc('ts'), bj = sc('burj'), th = sc('thanks');
+  E.push({ type: 'city', t: ts.start, dur: bj.start - ts.start + 0.4 });
+  E.push({ type: 'riser', t: bj.start + 4 * BEAT, dur: lg.start - bj.start - 4 * BEAT });
+  [2, 4, 5, 7].forEach(b => E.push({ type: 'firework', t: bj.start + b * BEAT }));
+  E.push({ type: 'impact', t: bj.start + 0.05 });
   E.push({ type: 'drop', t: lg.start }); E.push({ type: 'impact', t: lg.start });
   E.push({ type: 'outro', t: th.start });
   ['stop', 'price', 'zero', 'finale'].forEach(id => E.push({ type: 'impact', t: sc(id).start + (id === 'price' ? BEAT * 2 : 0.05) }));
@@ -72,8 +75,105 @@ function check(x, y, s, k, col) { if (k <= 0) return; ctx.save(); ctx.translate(
 function ring(x, y, r, p, col, w) { ctx.save(); ctx.lineCap = 'round'; ctx.lineWidth = w || 26; ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.stroke(); ctx.strokeStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 30; ctx.beginPath(); ctx.arc(x, y, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * clamp(p)); ctx.stroke(); ctx.restore(); }
 const kb = (s, t, b) => (t - s.start - b * BEAT) / (BEAT * 1.2); // reveal progress starting at beat b
 
+// per-letter staggered headline (expensive-looking kinetic type)
+function chars(text, x, y, size, k, o = {}) {
+  if (k <= 0) return; ctx.save(); ctx.font = `${o.weight || 900} ${size}px ${DISP}`; ctx.textBaseline = 'alphabetic'; ctx.letterSpacing = `${o.track ?? -3}px`;
+  const total = ctx.measureText(text).width; let cx = x - total / 2; const n = text.length;
+  for (let i = 0; i < n; i++) {
+    const ch = text[i], w = ctx.measureText(ch).width + (o.track ?? -3), kk = clamp(k * (1 + n * 0.08) - i * 0.08);
+    if (kk > 0) {
+      ctx.save(); ctx.translate(cx + w / 2, y + (1 - eo(kk)) * size * 0.6); ctx.rotate((1 - eo(kk)) * 0.25); ctx.scale(lerp(0.6, 1, eo(kk)), lerp(0.6, 1, eo(kk)));
+      ctx.globalAlpha = clamp(kk * 2); ctx.textAlign = 'center';
+      if (o.grad) { const g = ctx.createLinearGradient(-total / 2 - (cx - x + total / 2), 0, total / 2 - (cx - x + total / 2), 0); o.grad.forEach(([q, c]) => g.addColorStop(q, c)); ctx.fillStyle = g; } else ctx.fillStyle = o.color || '#f5f5f7';
+      if (o.glow) { ctx.shadowColor = o.glow; ctx.shadowBlur = 40; }
+      ctx.fillText(ch, 0, 0); ctx.restore();
+    }
+    cx += w;
+  }
+  ctx.restore();
+}
+function flare(x, y, k, t) { if (k <= 0) return; ctx.save(); ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha = clamp(k);
+  const g = ctx.createLinearGradient(0, y, W, y); g.addColorStop(0, 'rgba(120,170,255,0)'); g.addColorStop(0.5, 'rgba(200,220,255,0.9)'); g.addColorStop(1, 'rgba(120,170,255,0)'); ctx.fillStyle = g; ctx.fillRect(0, y - 3, W, 6);
+  const rg = ctx.createRadialGradient(x, y, 0, x, y, 160); rg.addColorStop(0, 'rgba(255,255,255,0.9)'); rg.addColorStop(1, 'rgba(120,170,255,0)'); ctx.fillStyle = rg; ctx.fillRect(x - 160, y - 160, 320, 320);
+  [[0.4, 40, '255,160,220'], [0.7, 24, '140,200,255'], [1.2, 60, '255,220,160']].forEach(([d, r, c]) => { const fx = lerp(x, W - x, d), fy = lerp(y, H - y, d * 0.3); ctx.fillStyle = `rgba(${c},0.18)`; ctx.beginPath(); ctx.arc(fx, fy, r, 0, 7); ctx.fill(); });
+  ctx.restore(); }
+// content shown on the giant screens
+function adContent(t, local) {
+  bg(t, 280, 1); bokeh(t, 30, 11);
+  if (local < 2.6) { chars('Мама.', 540, 920, 210, (local - 0.2) / 0.8, { color: '#ffffff', glow: 'rgba(255,255,255,0.6)' }); fade('мы тут кое-что придумали', 540, 1060, 50, (local - 1.2) / 0.6, '#d4d4d8'); }
+  else chars('Уговор', 540, 980, 240, (local - 2.6) / 0.8, { grad: [[0, '#ff9ff3'], [0.5, '#ffffff'], [1, '#7ab8ff']], glow: 'rgba(200,170,255,0.7)' });
+}
+function building(x0, x1, top, col, t, seed, lit) {
+  const bgc = ctx.createLinearGradient(0, top, 0, 1500); bgc.addColorStop(0, col); bgc.addColorStop(1, '#05040a'); ctx.fillStyle = bgc; ctx.fillRect(x0, top, x1 - x0, H - top);
+  ctx.fillStyle = 'rgba(255,255,255,0.06)'; ctx.fillRect(x0, top, 4, H - top); ctx.fillRect(x0, top, x1 - x0, 4);
+  const r = rng(seed); for (let y = top + 30; y < 1500; y += 46) for (let x = x0 + 14; x < x1 - 20; x += 34) if (r() < (lit || 0.35)) { ctx.fillStyle = `rgba(255,${200 + r() * 40 | 0},140,${0.25 + r() * 0.5})`; ctx.fillRect(x, y, 16, 22); }
+}
+function billboard(x, y, w, h, hue, t, i) {
+  ctx.fillStyle = '#000'; ctx.fillRect(x - 8, y - 8, w + 16, h + 16);
+  const ph = (t * 0.5 + i * 0.37) % 1; if (ph < 0.5) { const g2 = ctx.createRadialGradient(x + w * 0.3, y + h * 0.4, 0, x + w * 0.3, y + h * 0.4, w); g2.addColorStop(0, `hsl(${hue + 30},95%,65%)`); g2.addColorStop(1, `hsl(${hue - 30},90%,25%)`); ctx.fillStyle = g2; ctx.shadowColor = `hsl(${hue},90%,55%)`; ctx.shadowBlur = 60; ctx.fillRect(x, y, w, h); ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.beginPath(); ctx.arc(x + w * 0.72, y + h * 0.45, Math.min(w, h) * 0.22, 0, 7); ctx.fill(); ctx.fillRect(x + w * 0.1, y + h * 0.72, w * 0.45, h * 0.08); return; } const g = ctx.createLinearGradient(x, y, x + w, y + h); g.addColorStop(0, `hsl(${hue},90%,${50 + 10 * Math.sin(t * 2 + i)}%)`); g.addColorStop(1, `hsl(${hue + 50},90%,40%)`); ctx.fillStyle = g; ctx.shadowColor = `hsl(${hue},90%,55%)`; ctx.shadowBlur = 50; ctx.fillRect(x, y, w, h); ctx.shadowBlur = 0;
+  ctx.fillStyle = 'rgba(255,255,255,0.75)'; ctx.fillRect(x + w * 0.12, y + h * 0.35, w * 0.76 * (0.5 + 0.5 * Math.abs(Math.sin(t + i))), h * 0.08); ctx.fillRect(x + w * 0.12, y + h * 0.5, w * 0.5, h * 0.06); }
+function glow(x, y, r, color, a) { ctx.save(); ctx.globalAlpha = a; const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, color); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2); ctx.restore(); }
+function ledGrid(x0, y0, x1, y1) { ctx.save(); ctx.globalAlpha = 0.22; ctx.fillStyle = '#000'; for (let x = x0; x < x1; x += 7) ctx.fillRect(x, y0, 2, y1 - y0); for (let y = y0; y < y1; y += 7) ctx.fillRect(x0, y, x1 - x0, 2); ctx.restore(); }
+
 // ---------- scenes ----------
 const S = {};
+S.ts = (u, s, t) => {
+  const d = s.end - s.start, push = eio(clamp(u / d));
+  ctx.save(); const z = lerp(1, 1.9, push); ctx.translate(540, 760); ctx.scale(z, z); ctx.translate(-540, -760);
+  const sky = ctx.createLinearGradient(0, 0, 0, 900); sky.addColorStop(0, '#0b0620'); sky.addColorStop(1, '#2a1240'); ctx.fillStyle = sky; ctx.fillRect(-200, -200, W + 400, H + 400);
+  // far buildings + main screen tower
+  building(300, 780, 260, '#120d1f', t, 1, 0.2);
+  building(-60, 300, 120, '#0e0a18', t, 2); building(780, 1140, 160, '#0e0a18', t, 3);
+  building(-200, 120, 0, '#08060f', t, 4, 0.15); building(960, 1300, -40, '#08060f', t, 5, 0.15);
+  [[20, 300, 240, 200, 330], [-40, 620, 300, 160, 20], [790, 260, 250, 220, 190], [820, 600, 230, 180, 50], [60, 900, 200, 260, 140], [840, 880, 220, 240, 280], [330, 1180, 420, 90, 10]].forEach(([x, y, w, h, hu], i) => billboard(x, y, w, h, hu, t, i));
+  // the main vertical screen with our ad
+  const bx = 360, by = 300, bw = 360, bh = 640;
+  ctx.fillStyle = '#000'; ctx.fillRect(bx - 14, by - 14, bw + 28, bh + 28);
+  ctx.save(); ctx.beginPath(); ctx.rect(bx, by, bw, bh); ctx.clip(); ctx.translate(bx, by); ctx.scale(bw / W, bh / H); adContent(t, u); ctx.restore();
+  ledGrid(bx, by, bx + bw, by + bh);
+  glow(540, 620, 520, 'rgba(200,150,255,0.25)', 1);
+  // LED news ticker wrapping the buildings
+  ctx.fillStyle = '#050505'; ctx.fillRect(-200, 1010, W + 400, 90); ctx.save(); ctx.beginPath(); ctx.rect(-200, 1016, W + 400, 78); ctx.clip();
+  ctx.fillStyle = '#ff2d55'; ctx.font = `900 64px ${DISP}`; ctx.textBaseline = 'middle'; const tick = 'УГОВОР · 5 000 ₽ В НЕДЕЛЮ · ДЛЯ МАМЫ · '; const tw2 = ctx.measureText(tick).width; for (let k = -1; k < 3; k++) ctx.fillText(tick, -200 + k * tw2 - (t * 260) % tw2, 1056); ctx.restore(); ledGrid(-200, 1016, W + 200, 1094);
+  // street, taxis, crowd
+  ctx.fillStyle = '#0a0812'; ctx.fillRect(-200, 1250, W + 400, H);
+  // wet street reflections of the screens
+  [[180, 330], [540, 280], [900, 190], [400, 20]].forEach(([x, hu], i) => { const rg = ctx.createLinearGradient(0, 1250, 0, 1700); rg.addColorStop(0, `hsla(${hu},90%,60%,0.35)`); rg.addColorStop(1, `hsla(${hu},90%,60%,0)`); ctx.fillStyle = rg; ctx.fillRect(x - 60 + Math.sin(t * 2 + i) * 6, 1250, 120, 450); });
+  for (let i = 0; i < 4; i++) { const x = ((t * (500 + i * 120) + i * 400) % (W + 600)) - 300, y = 1300 + i * 26;
+    ctx.fillStyle = 'rgba(255,200,0,0.25)'; ctx.fillRect(x - 160, y + 10, 160, 16); ctx.fillStyle = '#f7c600'; ctx.beginPath(); ctx.roundRect(x, y, 170, 60, 14); ctx.fill(); ctx.fillStyle = '#ffe9a8'; ctx.fillRect(x + 150, y + 30, 18, 10); }
+  const r = rng(7); for (let i = 0; i < 26; i++) { const x = r() * 1200 - 60, y = 1500 + r() * 300, sc2 = 0.7 + r() * 0.6; ctx.fillStyle = '#05040a'; ctx.beginPath(); ctx.arc(x, y - 70 * sc2, 34 * sc2, 0, 7); ctx.fill(); ctx.beginPath(); ctx.roundRect(x - 50 * sc2, y - 40 * sc2, 100 * sc2, 200 * sc2, 40 * sc2); ctx.fill();
+    if (r() < 0.35) { ctx.fillStyle = 'rgba(160,190,255,0.9)'; ctx.fillRect(x + 20 * sc2, y - 150 * sc2, 26 * sc2, 44 * sc2); glow(x + 33 * sc2, y - 128 * sc2, 50, 'rgba(160,190,255,0.5)', 1); } }
+  ctx.restore();
+  fade('НЬЮ-ЙОРК · ТАЙМС-СКВЕР', 540, 300, 36, clamp(u * 2) * (1 - clamp((u - 3) * 2)), '#ffffff', 700);
+};
+S.burj = (u, s, t) => {
+  const d = s.end - s.start, tilt = eio(clamp(u / (d * 0.75))), dive = clamp((u - d * 0.75) / (d * 0.25));
+  ctx.save(); const z = 1 + eio(dive) * 5; ctx.translate(540, 760); ctx.scale(z, z); ctx.translate(-540, -760);
+  ctx.translate(0, lerp(-900, 260, tilt));
+  const sky = ctx.createLinearGradient(0, -900, 0, 2400); sky.addColorStop(0, '#02030c'); sky.addColorStop(1, '#1a1440'); ctx.fillStyle = sky; ctx.fillRect(-400, -1400, W + 800, 4400);
+  const r = rng(3); ctx.fillStyle = '#fff'; for (let i = 0; i < 120; i++) ctx.fillRect(r() * W, -1300 + r() * 2200, 2, 2);
+  // skyline at the base
+  for (let i = 0; i < 14; i++) building(-100 + i * 90, -100 + i * 90 + 80, 1900 + (i * 137 % 300), '#0a0b1a', t, 20 + i, 0.3);
+  // tower: stepped silhouette
+  const tw = (y) => lerp(240, 16, clamp((2100 - y) / 2900));
+  ctx.save(); ctx.beginPath(); for (let y = 2100; y >= -800; y -= 100) { const w = tw(y) * (Math.floor((2100 - y) / 400) % 2 ? 0.9 : 1); ctx.lineTo(540 - w, y); } for (let y = -800; y <= 2100; y += 100) { const w = tw(y) * (Math.floor((2100 - y) / 400) % 2 ? 0.9 : 1); ctx.lineTo(540 + w, y); } ctx.closePath();
+  ctx.fillStyle = '#0d1022'; ctx.fill(); ctx.clip();
+  // LED facade show
+  const g = ctx.createLinearGradient(0, -800, 0, 2100); const h0 = (t * 40) % 360; g.addColorStop(0, `hsl(${h0 + 280},90%,60%)`); g.addColorStop(0.5, `hsl(${h0 + 220},90%,55%)`); g.addColorStop(1, `hsl(${h0 + 320},90%,50%)`); ctx.fillStyle = g; ctx.fillRect(250, -800, 580, 2900);
+  ctx.fillStyle = '#ffffff'; ctx.font = `900 150px ${DISP}`; ctx.textAlign = 'center'; 'УГОВОР'.split('').forEach((ch, i) => { const kk = clamp((u - 0.4 - i * 0.18) / 0.4); ctx.globalAlpha = kk; ctx.fillText(ch, 540, 380 + i * 175); }); ctx.globalAlpha = 1;
+  ctx.font = `900 58px ${DISP}`; ctx.fillText('5 000 ₽', 540, 1640); ctx.font = `900 40px ${DISP}`; ctx.fillText('В НЕДЕЛЮ', 540, 1700);
+  ledGrid(250, -800, 830, 2100);
+  ctx.restore();
+  ctx.strokeStyle = '#8899cc'; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(540, -800); ctx.lineTo(540, -1150); ctx.stroke();
+  glow(540, 800, 700, 'rgba(180,120,255,0.18)', 1);
+  // fireworks on beats
+  [2, 4, 5, 7].forEach((b, i) => { const ft = t - (s.start + b * BEAT); if (ft < 0 || ft > 1.6) return; const fx = i % 2 ? 860 : 220, fy = 200 + i * 220; const rr = rng(40 + i);
+    for (let k = 0; k < 36; k++) { const a = rr() * 6.28, sp = 220 + rr() * 160, x = fx + Math.cos(a) * sp * eo(ft / 1.2), y = fy + Math.sin(a) * sp * eo(ft / 1.2) + ft * ft * 60; ctx.fillStyle = `hsla(${(i * 70 + 300) % 360},100%,70%,${1 - ft / 1.6})`; ctx.beginPath(); ctx.arc(x, y, 5, 0, 7); ctx.fill(); } });
+  ctx.restore();
+  fade('ДУБАЙ · БУРДЖ-ХАЛИФА', 540, 300, 36, clamp(u * 2) * (1 - clamp((u - 3) * 2)), '#ffffff', 700);
+  if (dive > 0.6) { ctx.fillStyle = `rgba(255,255,255,${(dive - 0.6) * 2.5})`; ctx.fillRect(0, 0, W, H); }
+};
 S.intro = (u, s, t) => {
   bg(t, 260, clamp(u / 2)); bokeh(t, 30, 1);
   rise('Мама.', 540, 900, 170, kb(s, t, 0.5), { t, shine: true });
@@ -89,8 +189,8 @@ S.logo = (u, s, t) => {
   bg(t, 280, 1); bokeh(t, 50, 3);
   const k = kb(s, t, 0);
   ctx.save(); const z = lerp(1.25, 1, eo(k)); ctx.translate(540, 900); ctx.scale(z, z); ctx.translate(-540, -900);
-  rise('Уговор', 540, 960, 230, k, { t, grad: [[0, '#ff9ff3'], [0.5, '#f5f5f7'], [1, '#7ab8ff']], shine: true, track0: 40, track: -6 });
-  ctx.restore();
+  chars('Уговор', 540, 960, 240, k, { grad: [[0, '#ff9ff3'], [0.5, '#ffffff'], [1, '#7ab8ff']], glow: 'rgba(200,170,255,0.6)' });
+  ctx.restore(); flare(lerp(200, 880, clamp(u / 3)), 900, 1 - clamp((u - 2) / 2), t);
   fade('Новый способ жить без лишних трат.', 540, 1090, 44, kb(s, t, 3), '#d4d4d8', 500);
   fade('ВЕРСИЯ ДЛЯ МАМЫ', 540, 1180, 30, kb(s, t, 5), '#8e8e93', 700);
 };
@@ -106,7 +206,7 @@ S.problem = (u, s, t) => {
 S.stop = (u, s, t) => {
   bg(t, 350, 0.9);
   const k = clamp(u / 0.18); ctx.save(); ctx.translate(540, 960); ctx.scale(lerp(1.6, 1, eo(k)), lerp(1.6, 1, eo(k))); ctx.translate(-540, -960);
-  rise('Хватит.', 540, 1010, 220, k * 2, { color: '#ffffff' }); ctx.restore();
+  chars('Хватит.', 540, 1010, 220, k * 1.5, { color: '#ffffff', glow: 'rgba(255,69,58,0.6)' }); ctx.restore();
 };
 S.price = (u, s, t) => {
   bg(t, 140, 1); bokeh(t, 40, 4);
@@ -166,7 +266,7 @@ S.compare = (u, s, t) => {
 function wrap(text, x, y, maxW, lh) { const words = text.split(' '); let line = '', lines = []; words.forEach(w => { const tt = line ? line + ' ' + w : w; if (ctx.measureText(tt).width > maxW && line) { lines.push(line); line = w; } else line = tt; }); lines.push(line); lines.forEach((l, i) => ctx.fillText(l, x, y + (i - (lines.length - 1) / 2) * lh + 12)); }
 S.finale = (u, s, t) => {
   bg(t, 280, 1); bokeh(t, 50, 6);
-  rise('Уговор', 540, 900, 200, kb(s, t, 0), { t, grad: [[0, '#ff9ff3'], [0.5, '#f5f5f7'], [1, '#7ab8ff']], shine: true });
+  chars('Уговор', 540, 900, 210, kb(s, t, 0), { grad: [[0, '#ff9ff3'], [0.5, '#ffffff'], [1, '#7ab8ff']], glow: 'rgba(200,170,255,0.6)' }); flare(lerp(880, 200, clamp(u / 3)), 840, 1 - clamp((u - 2) / 1.5), t);
   fade('Доступно с понедельника.', 540, 1030, 48, kb(s, t, 2), '#f5f5f7', 600);
   fade('Нужна только твоя подпись.', 540, 1100, 40, kb(s, t, 3.5), '#8e8e93', 500);
 };
@@ -186,9 +286,8 @@ S.button = (u, s, t) => {
 };
 S.thanks = (u, s, t) => {
   bg(t, 330, 1); bokeh(t, 60, 7);
-  rise('Спасибо, мам.', 540, 930, 130, kb(s, t, 0), { t, shine: true });
-  // heart
-  const k = kb(s, t, 2); if (k > 0) { ctx.save(); ctx.translate(540, 1120); const p = back(k) * (1 + 0.06 * Math.sin(t * 7)); ctx.scale(p * 2.6, p * 2.6); ctx.fillStyle = '#ff375f'; ctx.shadowColor = '#ff375f'; ctx.shadowBlur = 25; ctx.beginPath(); ctx.moveTo(0, 14); ctx.bezierCurveTo(-34, -14, -16, -42, 0, -22); ctx.bezierCurveTo(16, -42, 34, -14, 0, 14); ctx.fill(); ctx.restore(); }
+  chars('Спасибо, мам.', 540, 930, 130, kb(s, t, 0), { color: '#ffffff', glow: 'rgba(255,255,255,0.5)' });
+  fade('Уговор', 540, 1060, 44, kb(s, t, 2.5), '#a1a1aa', 800);
 };
 
 // ---------- frame ----------
@@ -202,9 +301,16 @@ function render(t, frame) {
   const lg = sc('logo'), th = sc('thanks'); const onBeat = t > lg.start && t < th.start ? Math.exp(-(((t - lg.start) % BEAT)) * 10) : 0;
   ctx.save(); const z = 1 + 0.012 * onBeat + 0.02 * (u / (s.end - s.start)); ctx.translate(540, 960); ctx.scale(z, z); ctx.translate(-540, -960);
   S[s.id](u, s, t); ctx.restore();
+  // zoom-blur + light leak on every cut (after the city intro)
+  if (u < 0.35 && i > 1) { const k = 1 - u / 0.35; const cp = document.createElement('canvas'); cp.width = W / 2; cp.height = H / 2; cp.getContext('2d').drawImage(cv, 0, 0, W / 2, H / 2);
+    ctx.save(); ctx.globalAlpha = 0.55 * k; ctx.filter = `blur(${12 * k}px)`; const zz = 1 + 0.12 * k; ctx.drawImage(cp, 540 - W * zz / 2, 960 - H * zz / 2, W * zz, H * zz); ctx.restore();
+    ctx.save(); ctx.globalCompositeOperation = 'screen'; const lx = lerp(-200, 1300, u / 0.35); const lg2 = ctx.createRadialGradient(lx, 700, 0, lx, 700, 700); lg2.addColorStop(0, `rgba(255,170,120,${0.45 * k})`); lg2.addColorStop(1, 'rgba(255,120,80,0)'); ctx.fillStyle = lg2; ctx.fillRect(0, 0, W, H); ctx.restore(); }
+  // cinematic bars during the city part, opening on the drop
+  const lgS = sc('logo'); const bar = t < lgS.start ? 200 : 200 * (1 - eo((t - lgS.start) / 0.6));
+  if (bar > 1) { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, bar); ctx.fillRect(0, H - bar, W, bar); }
   // cross-dissolve to black between scenes
   const d = s.end - s.start; if (d - u < 0.12) { ctx.fillStyle = `rgba(0,0,0,${(1 - (d - u) / 0.12) * 0.8})`; ctx.fillRect(0, 0, W, H); }
-  if (u < 0.1 && i > 0) { ctx.fillStyle = `rgba(0,0,0,${(1 - u / 0.1) * 0.8})`; ctx.fillRect(0, 0, W, H); }
+  if (u < 0.08 && i > 2) { ctx.fillStyle = `rgba(0,0,0,${(1 - u / 0.08) * 0.6})`; ctx.fillRect(0, 0, W, H); }
   // vignette + grain
   const g = ctx.createRadialGradient(540, 960, 500, 540, 960, 1250); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.5)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
   const r = rng(frame * 13 + 1), ox = Math.floor(r() * 512), oy = Math.floor(r() * 512);
