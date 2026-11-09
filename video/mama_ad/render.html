@@ -6,7 +6,7 @@
 <script>
 // «Уговор» — product-launch style ad. Kinetic type, glass cards, beat-synced.
 const W = 1080, H = 1920, cv = document.getElementById('c'), ctx = cv.getContext('2d');
-let TL, SC = [], BEAT = 0.5;
+let TL, SC = [], BEAT = 0.5, PULSE = 0;
 const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
 const lerp = (a, b, k) => a + (b - a) * k;
 const eo = k => 1 - Math.pow(1 - clamp(k), 4);
@@ -21,14 +21,14 @@ function setup(tl) {
   SC = tl.lines.map(l => ({ id: l.scene, start: l.start, end: l.end, lines: [l] }));
   const E = [];
   SC.forEach((s, i) => { if (i > 0) E.push({ type: 'whoosh', t: s.start - 0.22 }); });
-  const lg = sc('logo'), ts = sc('ts'), bj = sc('burj'), th = sc('thanks');
+  const lg = sc('logo'), ts = sc('ts'), bj = sc('burj'), th = sc('end');
   E.push({ type: 'city', t: ts.start, dur: bj.start - ts.start + 0.4 });
   E.push({ type: 'riser', t: bj.start + 4 * BEAT, dur: lg.start - bj.start - 4 * BEAT });
   [2, 4, 5, 7].forEach(b => E.push({ type: 'firework', t: bj.start + b * BEAT }));
   E.push({ type: 'impact', t: bj.start + 0.05 });
   E.push({ type: 'drop', t: lg.start }); E.push({ type: 'impact', t: lg.start });
   E.push({ type: 'outro', t: th.start });
-  ['stop', 'price', 'zero', 'finale'].forEach(id => E.push({ type: 'impact', t: sc(id).start + (id === 'price' ? BEAT * 2 : 0.05) }));
+  ['stop', 'price', 'zero', 'end'].forEach(id => E.push({ type: 'impact', t: sc(id).start + (id === 'price' ? BEAT * 2 : 0.05) }));
   const pc = sc('problem'); [0, 2, 4].forEach(b => E.push({ type: 'click', t: pc.start + b * BEAT }));
   const cd = sc('card'); [2, 4].forEach(b => E.push({ type: 'click', t: cd.start + b * BEAT }));
   const bt = sc('button'); E.push({ type: 'click', t: bt.start + BEAT * 5 }); E.push({ type: 'impact', t: bt.start + BEAT * 5.1 });
@@ -42,7 +42,7 @@ function bg(t, hue, intensity) {
   orbs.forEach(([x, y, r, h], i) => {
     const cx = W * x + Math.sin(t * 0.3 + i * 2) * 120, cy = H * y + Math.cos(t * 0.25 + i) * 140;
     const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-    g.addColorStop(0, `hsla(${h},85%,55%,${0.35 * (intensity ?? 1)})`); g.addColorStop(1, 'hsla(0,0%,0%,0)');
+    g.addColorStop(0, `hsla(${h},85%,55%,${0.35 * (intensity ?? 1) * (1 + 0.45 * PULSE)})`); g.addColorStop(1, 'hsla(0,0%,0%,0)');
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
   });
 }
@@ -224,14 +224,14 @@ S.zero = (u, s, t) => {
   const k = kb(s, t, 0);
   ring(540, 820, 230, eo(clamp(k)), '#0a84ff', 30);
   rise('0', 540, 905, 260, k, { color: '#ffffff' });
-  rise('доставок с твоей карты', 540, 1200, 70, kb(s, t, 2), { color: '#f5f5f7', weight: 800 });
+  chars('доставок с твоей карты', 540, 1200, 70, kb(s, t, 2), { color: '#f5f5f7', weight: 800, track: -1 });
   fade('ни Яндекс Еды, ни Самоката', 540, 1290, 40, kb(s, t, 3.5), '#8e8e93', 600);
 };
 S.card = (u, s, t) => {
   bg(t, 230, 0.8);
   // floating card
   const k = kb(s, t, 0), fl = Math.sin(t * 1.6) * 12;
-  ctx.save(); ctx.globalAlpha = clamp(k * 2); ctx.translate(540, 560 + fl + (1 - eo(k)) * 120); ctx.rotate(-0.06 + Math.sin(t) * 0.02);
+  ctx.save(); ctx.globalAlpha = clamp(k * 2); ctx.translate(540, 560 + fl + (1 - eo(k)) * 120); ctx.rotate(-0.06 + Math.sin(t) * 0.02); const flip = Math.cos((1 - eo(clamp(k))) * Math.PI * 0.9); ctx.scale(Math.max(0.04, Math.abs(flip)), 1); ctx.transform(1, Math.sin(t * 0.8) * 0.04, 0, 1, 0, 0);
   const g = ctx.createLinearGradient(-300, -180, 300, 180); g.addColorStop(0, '#3a3a5c'); g.addColorStop(1, '#14141f'); ctx.fillStyle = g; ctx.shadowColor = 'rgba(120,120,255,0.4)'; ctx.shadowBlur = 80;
   ctx.beginPath(); ctx.roundRect(-300, -185, 600, 370, 34); ctx.fill(); ctx.shadowColor = 'transparent';
   ctx.fillStyle = '#d4af37'; ctx.beginPath(); ctx.roundRect(-230, -80, 90, 66, 10); ctx.fill();
@@ -246,7 +246,7 @@ S.card = (u, s, t) => {
 };
 S.clean = (u, s, t) => {
   bg(t, 170, 0.8); bokeh(t, 25, 5);
-  rise('Уборка.', 540, 860, 150, kb(s, t, 0), { color: '#ffffff' });
+  chars('Уборка.', 540, 860, 150, kb(s, t, 0), { color: '#ffffff', glow: 'rgba(100,210,255,0.5)' });
   rise('Как и раньше.', 540, 1010, 90, kb(s, t, 1.5), { color: '#64d2ff', weight: 800 });
   rise('По максимуму.', 540, 1130, 90, kb(s, t, 3), { color: '#64d2ff', weight: 800 });
   // sparkle sweep
@@ -264,15 +264,10 @@ S.compare = (u, s, t) => {
   });
 };
 function wrap(text, x, y, maxW, lh) { const words = text.split(' '); let line = '', lines = []; words.forEach(w => { const tt = line ? line + ' ' + w : w; if (ctx.measureText(tt).width > maxW && line) { lines.push(line); line = w; } else line = tt; }); lines.push(line); lines.forEach((l, i) => ctx.fillText(l, x, y + (i - (lines.length - 1) / 2) * lh + 12)); }
-S.finale = (u, s, t) => {
-  bg(t, 280, 1); bokeh(t, 50, 6);
-  chars('Уговор', 540, 900, 210, kb(s, t, 0), { grad: [[0, '#ff9ff3'], [0.5, '#ffffff'], [1, '#7ab8ff']], glow: 'rgba(200,170,255,0.6)' }); flare(lerp(880, 200, clamp(u / 3)), 840, 1 - clamp((u - 2) / 1.5), t);
-  fade('Доступно с понедельника.', 540, 1030, 48, kb(s, t, 2), '#f5f5f7', 600);
-  fade('Нужна только твоя подпись.', 540, 1100, 40, kb(s, t, 3.5), '#8e8e93', 500);
-};
+
 S.button = (u, s, t) => {
   bg(t, 300, 0.9);
-  rise('Согласна?', 540, 760, 130, kb(s, t, 0), { color: '#ffffff' });
+  chars('Согласна?', 540, 760, 130, kb(s, t, 0), { color: '#ffffff', glow: 'rgba(10,132,255,0.5)' });
   const k = kb(s, t, 1.5), press = t > s.start + BEAT * 5 && t < s.start + BEAT * 5.4 ? 0.92 : 1, done = t > s.start + BEAT * 5.2;
   if (k > 0) {
     ctx.save(); ctx.translate(540, 1000); const p = (done ? 1 : 1 + 0.03 * Math.sin(t * 6)) * press * lerp(0.7, 1, back(k)); ctx.scale(p, p); ctx.globalAlpha = clamp(k * 2);
@@ -284,10 +279,15 @@ S.button = (u, s, t) => {
   const ck = clamp((t - s.start - BEAT * 3) / (BEAT * 2));
   if (ck > 0 && !done) { ctx.save(); ctx.translate(lerp(900, 600, eio(ck)), lerp(1500, 1040, eio(ck))); ctx.scale(press * 1.4, press * 1.4); ctx.fillStyle = '#fff'; ctx.strokeStyle = '#111'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, 70); ctx.lineTo(18, 54); ctx.lineTo(32, 84); ctx.lineTo(44, 78); ctx.lineTo(30, 50); ctx.lineTo(54, 50); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore(); }
 };
-S.thanks = (u, s, t) => {
-  bg(t, 330, 1); bokeh(t, 60, 7);
-  chars('Спасибо, мам.', 540, 930, 130, kb(s, t, 0), { color: '#ffffff', glow: 'rgba(255,255,255,0.5)' });
-  fade('Уговор', 540, 1060, 44, kb(s, t, 2.5), '#a1a1aa', 800);
+S.end = (u, s, t) => {
+  bg(t, 280, 1 - 0.6 * clamp((u - 2.5) / 1.5)); bokeh(t, 50, 6);
+  const k = kb(s, t, 0);
+  ctx.save(); const z = lerp(0.92, 1.0, eo(clamp(u / 4))); ctx.translate(540, 900); ctx.scale(z, z); ctx.translate(-540, -900);
+  chars('Уговор', 540, 930, 230, k, { grad: [[0, '#ff9ff3'], [0.5, '#ffffff'], [1, '#7ab8ff']], glow: 'rgba(200,170,255,0.6)' });
+  ctx.restore();
+  flare(lerp(150, 930, clamp((u - 0.3) / 2.2)), 860, 1 - clamp((u - 2.2) / 1.2), t);
+  fade('Доступно с понедельника.', 540, 1060, 48, kb(s, t, 2.5), '#f5f5f7', 600);
+  fade('Нужна только твоя подпись.', 540, 1140, 36, kb(s, t, 4), '#8e8e93', 700);
 };
 
 // ---------- frame ----------
@@ -298,8 +298,8 @@ function render(t, frame) {
   const i = Math.max(0, SC.findIndex(s => t >= s.start && t < s.end)), s = SC[SC.findIndex(s => t >= s.start && t < s.end) < 0 ? SC.length - 1 : i];
   const u = t - s.start;
   // subtle beat pulse after the drop
-  const lg = sc('logo'), th = sc('thanks'); const onBeat = t > lg.start && t < th.start ? Math.exp(-(((t - lg.start) % BEAT)) * 10) : 0;
-  ctx.save(); const z = 1 + 0.012 * onBeat + 0.02 * (u / (s.end - s.start)); ctx.translate(540, 960); ctx.scale(z, z); ctx.translate(-540, -960);
+  const lg = sc('logo'), th = sc('end'); const onBeat = t > lg.start && t < th.start ? Math.exp(-(((t - lg.start) % BEAT)) * 10) : 0; PULSE = onBeat;
+  ctx.save(); const z = 1 + 0.025 * onBeat + 0.03 * (u / (s.end - s.start)); ctx.translate(540 + Math.sin(t * 0.7) * 10, 960 + Math.cos(t * 0.5) * 12); ctx.rotate(Math.sin(t * 0.4) * 0.006); ctx.scale(z, z); ctx.translate(-540, -960);
   S[s.id](u, s, t); ctx.restore();
   // zoom-blur + light leak on every cut (after the city intro)
   if (u < 0.35 && i > 1) { const k = 1 - u / 0.35; const cp = document.createElement('canvas'); cp.width = W / 2; cp.height = H / 2; cp.getContext('2d').drawImage(cv, 0, 0, W / 2, H / 2);
